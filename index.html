@@ -522,6 +522,43 @@
   .service-tile h3 { font-size: 1.08rem; margin-bottom: 8px; }
   .service-tile p { color: var(--ink-muted); font-size: 0.9rem; margin: 0; }
 
+  /* ---------- people ---------- */
+
+  .people-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .people-card {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .people-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 40px -24px hsl(var(--shadow) / 0.4);
+  }
+
+  .people-card img {
+    display: block;
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: var(--surface-tint);
+  }
+
+  .people-card figcaption { padding: 20px 22px 24px; }
+  .people-card h3 { font-size: 1.05rem; margin-bottom: 8px; }
+  .people-card p { color: var(--ink-muted); font-size: 0.9rem; margin: 0; }
+
+  @media (max-width: 900px) {
+    .people-grid { grid-template-columns: 1fr; }
+  }
+
   /* ---------- trust ---------- */
 
   .trust {
@@ -872,6 +909,40 @@
           <h3>Dog Walking</h3>
           <p>Background-checked walkers for 30/60-minute walks, pet sitting, or overnight boarding — book down to the slot.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PEOPLE -->
+  <section class="tight">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Who's on the other end</p>
+        <h2>Licensed vets. Vetted walkers. Real labs.</h2>
+        <p class="lede">Every booking on Kennelo connects you to an actual professional — not a call center.</p>
+      </div>
+      <div class="people-grid">
+        <figure class="people-card">
+          <img src="photos/vet.jpg" alt="A veterinarian examining a dog on a clinic table" loading="lazy" />
+          <figcaption>
+            <h3>Licensed Veterinarians</h3>
+            <p>Registered, practicing vets — filtered by specialty, not just by who picked up the phone.</p>
+          </figcaption>
+        </figure>
+        <figure class="people-card">
+          <img src="photos/walker.jpg" alt="A dog walker walking a dog on a city sidewalk" loading="lazy" />
+          <figcaption>
+            <h3>Background-Checked Walkers</h3>
+            <p>Verified before they can take a single booking, so you know exactly who's holding the leash.</p>
+          </figcaption>
+        </figure>
+        <figure class="people-card">
+          <img src="photos/lab.jpg" alt="Rows of labeled blood collection tubes in a lab rack" loading="lazy" />
+          <figcaption>
+            <h3>Home Sample Collection</h3>
+            <p>A technician comes to you; results are reviewed by a vet, not just texted over as raw numbers.</p>
+          </figcaption>
+        </figure>
       </div>
     </div>
   </section>
