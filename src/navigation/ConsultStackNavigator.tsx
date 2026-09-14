@@ -1,7 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ChatScreen from '../screens/ChatScreen';
 import ConsultMainScreen from '../screens/ConsultMainScreen';
-import ConsultPaymentScreen from '../screens/ConsultPaymentScreen';
 import VideoCallScreen from '../screens/VideoCallScreen';
 import { colors } from '../theme/colors';
 import { ConsultStackParamList } from './types';
@@ -19,7 +18,6 @@ export default function ConsultStackNavigator() {
       }}
     >
       <Stack.Screen name="ConsultMain" component={ConsultMainScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Payment" component={ConsultPaymentScreen} options={{ title: 'Payment' }} />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
     </Stack.Navigator>

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,62 +13,92 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChatMessage, doctorThreads, owners, pets } from '../data/mockData';
+import { getThread, listMessages, sendMessage, subscribeToMessages } from '../api/chat';
+import { getPet } from '../api/pets';
+import { getProfile } from '../api/profiles';
+import { useAuth } from '../lib/AuthContext';
+import { ChatMessageRow, ChatThread, Pet, Profile } from '../lib/database.types';
+import { formatTimeLabel } from '../lib/format';
 import { DoctorMessagesStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<DoctorMessagesStackParamList, 'Chat'>;
 
-const AUTO_REPLIES = [
-  "Thank you, doctor! We'll keep an eye on that.",
-  'Got it, we will follow your advice.',
-  'Should we come in for a visit, or is this fine to monitor at home?',
-  'Thanks for the quick reply!',
-];
-
 export default function DoctorChatScreen({ route, navigation }: Props) {
-  const thread = doctorThreads.find((t) => t.id === route.params.threadId)!;
-  const pet = pets.find((p) => p.id === thread.petId)!;
-  const owner = owners.find((o) => o.id === pet.ownerId)!;
-  const [messages, setMessages] = useState<ChatMessage[]>(thread.messages);
+  const { profile } = useAuth();
+  const [thread, setThread] = useState<ChatThread | null>(null);
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [owner, setOwner] = useState<Profile | null>(null);
+  const [messages, setMessages] = useState<ChatMessageRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<ScrollView>(null);
 
+  useEffect(() => {
+    (async () => {
+      const t = await getThread(route.params.threadId);
+      if (!t) {
+        setLoading(false);
+        return;
+      }
+      const [o, p, msgs] = await Promise.all([
+        getProfile(t.owner_id),
+        t.pet_id ? getPet(t.pet_id) : Promise.resolve(null),
+        listMessages(t.id),
+      ]);
+      setThread(t);
+      setOwner(o);
+      setPet(p);
+      setMessages(msgs);
+      setLoading(false);
+    })();
+  }, [route.params.threadId]);
+
+  useEffect(() => {
+    if (!thread) return;
+    const unsubscribe = subscribeToMessages(thread.id, (message) => {
+      setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    return unsubscribe;
+  }, [thread]);
+
   useLayoutEffect(() => {
-    navigation.setOptions({ title: `${owner.name}` });
+    navigation.setOptions({ title: owner?.name ?? 'Chat' });
   }, [navigation, owner]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = draft.trim();
-    if (!text) return;
-    const doctorMessage: ChatMessage = {
-      id: `v-${Date.now()}`,
-      sender: 'vet',
-      text,
-      time: 'Now',
-    };
-    setMessages((prev) => [...prev, doctorMessage]);
+    if (!text || !thread || !profile) return;
     setDraft('');
-
-    setTimeout(() => {
-      const reply: ChatMessage = {
-        id: `u-${Date.now()}`,
-        sender: 'user',
-        text: AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)],
-        time: 'Now',
-      };
-      setMessages((prev) => [...prev, reply]);
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }, 900);
-
+    const message = await sendMessage(thread.id, profile.id, text);
+    setMessages((prev) => [...prev, message]);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!thread || !owner || !profile) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
+        <Text style={styles.emptyText}>Conversation not found.</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
-      <View style={styles.subHeader}>
-        <Text style={styles.subHeaderText}>Re: {pet.name} ({pet.breed})</Text>
-      </View>
+      {pet && (
+        <View style={styles.subHeader}>
+          <Text style={styles.subHeaderText}>Re: {pet.name} ({pet.breed ?? pet.species})</Text>
+        </View>
+      )}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -79,12 +110,15 @@ export default function DoctorChatScreen({ route, navigation }: Props) {
           contentContainerStyle={styles.messagesContent}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
         >
+          {messages.length === 0 && <Text style={styles.emptyText}>No messages yet.</Text>}
           {messages.map((message) => {
-            const isSelf = message.sender === 'vet';
+            const isSelf = message.sender_id === profile.id;
             return (
               <View key={message.id} style={[styles.bubble, isSelf ? styles.bubbleSelf : styles.bubbleOther]}>
                 <Text style={[styles.bubbleText, isSelf && styles.bubbleTextSelf]}>{message.text}</Text>
-                <Text style={[styles.bubbleTime, isSelf && styles.bubbleTimeSelf]}>{message.time}</Text>
+                <Text style={[styles.bubbleTime, isSelf && styles.bubbleTimeSelf]}>
+                  {formatTimeLabel(message.created_at)}
+                </Text>
               </View>
             );
           })}
@@ -129,6 +163,11 @@ const styles = StyleSheet.create({
   messagesContent: {
     padding: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    marginTop: spacing.lg,
   },
   bubble: {
     maxWidth: '78%',

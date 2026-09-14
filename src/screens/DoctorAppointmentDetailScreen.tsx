@@ -1,34 +1,80 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { appointments, owners, pets } from '../data/mockData';
+import { getAppointment, updateAppointmentStatus } from '../api/bookings';
+import { getPet } from '../api/pets';
+import { getProfile } from '../api/profiles';
+import { Appointment, Pet, Profile } from '../lib/database.types';
+import { formatDateLabel, formatTimeLabel } from '../lib/format';
+import { petToCardView } from '../lib/viewModels';
 import { DoctorAppointmentsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<DoctorAppointmentsStackParamList, 'AppointmentDetail'>;
 
 export default function DoctorAppointmentDetailScreen({ route, navigation }: Props) {
-  const appointment = appointments.find((a) => a.id === route.params.appointmentId)!;
-  const pet = pets.find((p) => p.id === appointment.petId)!;
-  const owner = owners.find((o) => o.id === pet.ownerId)!;
-  const [localStatus, setLocalStatus] = useState<typeof appointment.status | null>(null);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [owner, setOwner] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
-  const status = localStatus ?? appointment.status;
+  useEffect(() => {
+    (async () => {
+      const a = await getAppointment(route.params.appointmentId);
+      if (!a) {
+        setLoading(false);
+        return;
+      }
+      const p = await getPet(a.pet_id);
+      const o = p ? await getProfile(p.owner_id) : null;
+      setAppointment(a);
+      setPet(p);
+      setOwner(o);
+      setLoading(false);
+    })();
+  }, [route.params.appointmentId]);
+
+  const handleStatusChange = async (status: 'completed' | 'cancelled') => {
+    if (!appointment || updating) return;
+    setUpdating(true);
+    await updateAppointmentStatus(appointment.id, status);
+    setAppointment({ ...appointment, status });
+    setUpdating(false);
+  };
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  if (!appointment || !pet || !owner) {
+    return (
+      <ScreenContainer>
+        <Text>Appointment not found.</Text>
+      </ScreenContainer>
+    );
+  }
+
+  const view = petToCardView(pet);
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Avatar initial={pet.initial} color={pet.color} size={64} uri={pet.photoUrl} />
+        <Avatar initial={view.initial} color={view.color} size={64} uri={view.photoUrl} />
         <Text style={styles.petName}>{pet.name}</Text>
-        <Text style={styles.petMeta}>{pet.species} · {pet.breed}</Text>
+        <Text style={styles.petMeta}>{pet.species} · {pet.breed ?? ''}</Text>
         <Badge
-          label={status}
-          tone={status === 'completed' ? 'success' : status === 'cancelled' ? 'danger' : 'neutral'}
+          label={appointment.status}
+          tone={appointment.status === 'completed' ? 'success' : appointment.status === 'cancelled' ? 'danger' : 'neutral'}
         />
       </View>
 
@@ -39,29 +85,35 @@ export default function DoctorAppointmentDetailScreen({ route, navigation }: Pro
         <Ionicons name="person-circle-outline" size={22} color={colors.textMuted} />
         <View style={styles.ownerInfo}>
           <Text style={styles.ownerName}>{owner.name}</Text>
-          <Text style={styles.ownerContact}>{owner.phone}</Text>
+          <Text style={styles.ownerContact}>{owner.phone ?? owner.email}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </TouchableOpacity>
 
       <View style={styles.card}>
-        <DetailRow icon="calendar-outline" label="Date" value={appointment.date} />
-        <DetailRow icon="time-outline" label="Time" value={appointment.time} />
+        <DetailRow icon="calendar-outline" label="Date" value={formatDateLabel(appointment.slot_at)} />
+        <DetailRow icon="time-outline" label="Time" value={formatTimeLabel(appointment.slot_at)} />
         <DetailRow
           icon={appointment.type === 'video' ? 'videocam-outline' : 'location-outline'}
           label="Type"
           value={appointment.type === 'video' ? 'Video call' : 'In-clinic visit'}
         />
-        <DetailRow icon="document-text-outline" label="Reason" value={appointment.reason} />
+        <DetailRow icon="document-text-outline" label="Reason" value={appointment.reason ?? ''} />
       </View>
 
-      {status === 'upcoming' && (
+      {appointment.status === 'upcoming' && (
         <View style={styles.actions}>
-          <Button label="Mark as Completed" onPress={() => setLocalStatus('completed')} style={styles.actionButton} />
+          <Button
+            label="Mark as Completed"
+            onPress={() => handleStatusChange('completed')}
+            loading={updating}
+            style={styles.actionButton}
+          />
           <Button
             label="Cancel Visit"
             variant="secondary"
-            onPress={() => setLocalStatus('cancelled')}
+            onPress={() => handleStatusChange('cancelled')}
+            loading={updating}
             style={styles.actionButton}
           />
         </View>

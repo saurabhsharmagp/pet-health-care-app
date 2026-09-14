@@ -1,32 +1,59 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { labTestPackages, labTestSlots, pets } from '../data/mockData';
+import { getLabTestPackage, getLabTestSlots } from '../api/labTests';
+import { listMyPets } from '../api/pets';
+import { useAuth } from '../lib/AuthContext';
+import { LabTestPackage, Pet } from '../lib/database.types';
+import { petToCardView } from '../lib/viewModels';
 import { LabTestsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<LabTestsStackParamList, 'BookLabTest'>;
 
+const slotGroups = getLabTestSlots();
+
 export default function BookLabTestScreen({ route, navigation }: Props) {
-  const pkg = labTestPackages.find((p) => p.id === route.params.packageId)!;
-  const [petId, setPetId] = useState(pets[0].id);
+  const { profile } = useAuth();
+  const [pkg, setPkg] = useState<LabTestPackage | null>(null);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [petId, setPetId] = useState<string | null>(null);
   const [dateIndex, setDateIndex] = useState(0);
-  const [time, setTime] = useState<string | null>(null);
+  const [time, setTime] = useState<{ label: string; slotAt: string } | null>(null);
   const [address, setAddress] = useState('');
 
-  const selectedSlot = labTestSlots[dateIndex];
-  const canSubmit = Boolean(time && address.trim().length > 0);
+  useEffect(() => {
+    if (!profile) return;
+    Promise.all([getLabTestPackage(route.params.packageId), listMyPets(profile.id)]).then(([p, myPets]) => {
+      setPkg(p);
+      setPets(myPets);
+      setPetId(myPets[0]?.id ?? null);
+      setLoading(false);
+    });
+  }, [route.params.packageId, profile]);
+
+  if (loading || !pkg) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  const selectedSlot = slotGroups[dateIndex];
+  const canSubmit = Boolean(petId && time && address.trim().length > 0);
 
   const handleContinue = () => {
-    if (!canSubmit || !time) return;
-    navigation.navigate('Payment', {
+    if (!canSubmit || !time || !petId) return;
+    navigation.navigate('ConfirmBooking', {
       packageId: pkg.id,
       petId,
-      date: selectedSlot.date,
-      time,
+      slotAt: time.slotAt,
       address: address.trim(),
       amount: pkg.price,
     });
@@ -38,25 +65,30 @@ export default function BookLabTestScreen({ route, navigation }: Props) {
       <Text style={styles.subtitle}>{pkg.category} · ₹{pkg.price.toLocaleString('en-IN')}</Text>
 
       <Text style={styles.sectionTitle}>Select pet</Text>
-      <View style={styles.rowWrap}>
-        {pets.map((pet) => {
-          const active = pet.id === petId;
-          return (
-            <TouchableOpacity
-              key={pet.id}
-              style={[styles.petOption, active && styles.petOptionActive]}
-              onPress={() => setPetId(pet.id)}
-            >
-              <Avatar initial={pet.initial} color={pet.color} size={32} uri={pet.photoUrl} />
-              <Text style={[styles.petOptionText, active && styles.petOptionTextActive]}>{pet.name}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {pets.length === 0 ? (
+        <Text style={styles.emptyText}>You don't have any pets yet — add one from your profile first.</Text>
+      ) : (
+        <View style={styles.rowWrap}>
+          {pets.map((pet) => {
+            const view = petToCardView(pet);
+            const active = pet.id === petId;
+            return (
+              <TouchableOpacity
+                key={pet.id}
+                style={[styles.petOption, active && styles.petOptionActive]}
+                onPress={() => setPetId(pet.id)}
+              >
+                <Avatar initial={view.initial} color={view.color} size={32} uri={view.photoUrl} />
+                <Text style={[styles.petOptionText, active && styles.petOptionTextActive]}>{view.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       <Text style={styles.sectionTitle}>Select collection date</Text>
       <View style={styles.rowWrap}>
-        {labTestSlots.map((slot, idx) => {
+        {slotGroups.map((slot, idx) => {
           const active = idx === dateIndex;
           return (
             <TouchableOpacity
@@ -76,14 +108,14 @@ export default function BookLabTestScreen({ route, navigation }: Props) {
       <Text style={styles.sectionTitle}>Select time</Text>
       <View style={styles.rowWrap}>
         {selectedSlot.times.map((t) => {
-          const active = t === time;
+          const active = t.slotAt === time?.slotAt;
           return (
             <TouchableOpacity
-              key={t}
+              key={t.slotAt}
               style={[styles.dateChip, active && styles.dateChipActive]}
               onPress={() => setTime(t)}
             >
-              <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>{t}</Text>
+              <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>{t.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -107,7 +139,7 @@ export default function BookLabTestScreen({ route, navigation }: Props) {
       )}
 
       <Button
-        label={`Continue to Payment${time ? ` · ${time}` : ''}`}
+        label={`Continue${time ? ` · ${time.label}` : ''}`}
         onPress={handleContinue}
         disabled={!canSubmit}
         style={styles.confirmButton}
@@ -134,6 +166,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
   },
   rowWrap: {
     flexDirection: 'row',

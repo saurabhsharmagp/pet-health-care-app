@@ -1,9 +1,14 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AppointmentCard from '../components/AppointmentCard';
 import ScreenContainer from '../components/ScreenContainer';
-import { appointments, vets } from '../data/mockData';
+import { listMyAppointments } from '../api/bookings';
+import { listVets, VetDirectoryEntry } from '../api/professionals';
+import { useAuth } from '../lib/AuthContext';
+import { Appointment } from '../lib/database.types';
+import { appointmentToCardView, vetToCardView } from '../lib/viewModels';
 import { AppointmentsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -15,11 +20,32 @@ const tabs: { key: 'upcoming' | 'past'; label: string }[] = [
 ];
 
 export default function AppointmentsListScreen({ navigation }: Props) {
+  const { profile } = useAuth();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [loading, setLoading] = useState(true);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [vets, setVets] = useState<VetDirectoryEntry[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      let active = true;
+      (async () => {
+        const [myAppointments, vetList] = await Promise.all([listMyAppointments(profile.id), listVets()]);
+        if (!active) return;
+        setAppointments(myAppointments);
+        setVets(vetList);
+        setLoading(false);
+      })();
+      return () => {
+        active = false;
+      };
+    }, [profile])
+  );
 
   const filtered = useMemo(() => {
     return appointments.filter((a) => (tab === 'upcoming' ? a.status === 'upcoming' : a.status !== 'upcoming'));
-  }, [tab]);
+  }, [tab, appointments]);
 
   return (
     <ScreenContainer>
@@ -40,18 +66,21 @@ export default function AppointmentsListScreen({ navigation }: Props) {
         })}
       </View>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      ) : filtered.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No {tab} appointments yet.</Text>
         </View>
       ) : (
         filtered.map((appointment) => {
-          const vet = vets.find((v) => v.id === appointment.vetId)!;
+          const vet = vets.find((v) => v.id === appointment.vet_id);
+          if (!vet) return null;
           return (
             <AppointmentCard
               key={appointment.id}
-              appointment={appointment}
-              vet={vet}
+              appointment={appointmentToCardView(appointment)}
+              vet={vetToCardView(vet)}
               onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: appointment.id })}
             />
           );

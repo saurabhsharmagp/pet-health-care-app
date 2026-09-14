@@ -1,11 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Vet } from '../data/mockData';
 import { colors, radius, spacing } from '../theme/colors';
 import Avatar from './Avatar';
 
+type VetCardVet = {
+  initial: string;
+  color: string;
+  photoUrl?: string;
+  name: string;
+  specialty: string;
+  clinic: string;
+  distanceKm: number;
+  rating: number;
+  reviewsCount: number;
+  priceLabel: string;
+};
+
 type Props = {
-  vet: Vet;
+  vet: VetCardVet;
   onPress: () => void;
 };
 

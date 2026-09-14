@@ -1,19 +1,59 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { pets, vets } from '../data/mockData';
+import { getAppointment } from '../api/bookings';
+import { getPet } from '../api/pets';
+import { getVet, VetDirectoryEntry } from '../api/professionals';
+import { Appointment, Pet } from '../lib/database.types';
+import { formatDateLabel, formatTimeLabel } from '../lib/format';
+import { vetToCardView } from '../lib/viewModels';
 import { HomeStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'AppointmentConfirmation'>;
 
 export default function AppointmentConfirmationScreen({ route, navigation }: Props) {
-  const { vetId, petId, date, time, type, reason } = route.params;
-  const vet = vets.find((v) => v.id === vetId)!;
-  const pet = pets.find((p) => p.id === petId)!;
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [vet, setVet] = useState<VetDirectoryEntry | null>(null);
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const a = await getAppointment(route.params.appointmentId);
+      if (!a) {
+        setLoading(false);
+        return;
+      }
+      const [v, p] = await Promise.all([getVet(a.vet_id), getPet(a.pet_id)]);
+      setAppointment(a);
+      setVet(v);
+      setPet(p);
+      setLoading(false);
+    })();
+  }, [route.params.appointmentId]);
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  if (!appointment || !vet || !pet) {
+    return (
+      <ScreenContainer>
+        <Text>Appointment not found.</Text>
+      </ScreenContainer>
+    );
+  }
+
+  const view = vetToCardView(vet);
 
   return (
     <ScreenContainer>
@@ -29,22 +69,22 @@ export default function AppointmentConfirmationScreen({ route, navigation }: Pro
 
       <View style={styles.card}>
         <View style={styles.row}>
-          <Avatar initial={vet.initial} color={vet.color} size={48} uri={vet.photoUrl} />
+          <Avatar initial={view.initial} color={view.color} size={48} uri={view.photoUrl} />
           <View style={styles.info}>
-            <Text style={styles.vetName}>{vet.name}</Text>
-            <Text style={styles.vetSpecialty}>{vet.specialty}</Text>
+            <Text style={styles.vetName}>{view.name}</Text>
+            <Text style={styles.vetSpecialty}>{view.specialty}</Text>
           </View>
         </View>
         <View style={styles.divider} />
         <DetailRow icon="paw-outline" label="Pet" value={pet.name} />
-        <DetailRow icon="calendar-outline" label="Date" value={date} />
-        <DetailRow icon="time-outline" label="Time" value={time} />
+        <DetailRow icon="calendar-outline" label="Date" value={formatDateLabel(appointment.slot_at)} />
+        <DetailRow icon="time-outline" label="Time" value={formatTimeLabel(appointment.slot_at)} />
         <DetailRow
-          icon={type === 'video' ? 'videocam-outline' : 'location-outline'}
+          icon={appointment.type === 'video' ? 'videocam-outline' : 'location-outline'}
           label="Type"
-          value={type === 'video' ? 'Video call' : `In-clinic · ${vet.clinic}`}
+          value={appointment.type === 'video' ? 'Video call' : `In-clinic · ${view.clinic}`}
         />
-        <DetailRow icon="document-text-outline" label="Reason" value={reason} />
+        <DetailRow icon="document-text-outline" label="Reason" value={appointment.reason ?? ''} />
       </View>
 
       <Button

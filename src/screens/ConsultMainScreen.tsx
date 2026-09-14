@@ -1,44 +1,101 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import ScreenContainer from '../components/ScreenContainer';
-import { chatThreads, vets } from '../data/mockData';
+import { getOrCreateThread, listMessages, listThreadsForOwner } from '../api/chat';
+import { listVets, VetDirectoryEntry } from '../api/professionals';
+import { useAuth } from '../lib/AuthContext';
+import { ChatMessageRow, ChatThread } from '../lib/database.types';
+import { formatTimeLabel } from '../lib/format';
+import { vetToCardView } from '../lib/viewModels';
 import { ConsultStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<ConsultStackParamList, 'ConsultMain'>;
 
+type RecentThread = { thread: ChatThread; vet: VetDirectoryEntry; lastMessage: ChatMessageRow | null };
+
 export default function ConsultMainScreen({ navigation }: Props) {
-  const recentVetIds = Object.keys(chatThreads);
-  const recentVets = vets.filter((v) => recentVetIds.includes(v.id));
-  const otherVets = vets.filter((v) => !recentVetIds.includes(v.id));
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [vets, setVets] = useState<VetDirectoryEntry[]>([]);
+  const [recent, setRecent] = useState<RecentThread[]>([]);
+  const [startingVetId, setStartingVetId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      let active = true;
+      (async () => {
+        const [vetList, threads] = await Promise.all([listVets(), listThreadsForOwner(profile.id)]);
+        if (!active) return;
+        setVets(vetList);
+
+        const withMessages = await Promise.all(
+          threads.map(async (thread) => {
+            const vet = vetList.find((v) => v.id === thread.professional_id);
+            if (!vet) return null;
+            const messages = await listMessages(thread.id);
+            const lastMessage: ChatMessageRow | null = messages.length > 0 ? messages[messages.length - 1] : null;
+            return { thread, vet, lastMessage };
+          })
+        );
+        if (!active) return;
+        setRecent(withMessages.filter((r): r is RecentThread => r !== null));
+        setLoading(false);
+      })();
+      return () => {
+        active = false;
+      };
+    }, [profile])
+  );
+
+  const recentVetIds = new Set(recent.map((r) => r.vet.id));
+  const otherVets = vets.filter((v) => !recentVetIds.has(v.id));
+
+  const startChat = async (vetId: string) => {
+    if (!profile || startingVetId) return;
+    setStartingVetId(vetId);
+    const thread = await getOrCreateThread(profile.id, vetId, null);
+    setStartingVetId(null);
+    navigation.navigate('Chat', { threadId: thread.id });
+  };
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
       <Text style={styles.title}>Consult a Vet</Text>
       <Text style={styles.subtitle}>Chat or video call a vet from anywhere</Text>
 
-      {recentVets.length > 0 && (
+      {recent.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>Recent conversations</Text>
-          {recentVets.map((vet) => {
-            const lastMessage = chatThreads[vet.id][chatThreads[vet.id].length - 1];
+          {recent.map(({ thread, vet, lastMessage }) => {
+            const view = vetToCardView(vet);
             return (
               <TouchableOpacity
-                key={vet.id}
+                key={thread.id}
                 style={styles.threadRow}
-                onPress={() => navigation.navigate('Chat', { vetId: vet.id })}
+                onPress={() => navigation.navigate('Chat', { threadId: thread.id })}
               >
-                <Avatar initial={vet.initial} color={vet.color} size={48} uri={vet.photoUrl} />
+                <Avatar initial={view.initial} color={view.color} size={48} uri={view.photoUrl} />
                 <View style={styles.threadInfo}>
-                  <Text style={styles.vetName}>{vet.name}</Text>
+                  <Text style={styles.vetName}>{view.name}</Text>
                   <Text style={styles.lastMessage} numberOfLines={1}>
-                    {lastMessage.sender === 'user' ? 'You: ' : ''}
-                    {lastMessage.text}
+                    {lastMessage ? (lastMessage.sender_id === profile?.id ? 'You: ' : '') + lastMessage.text : 'Say hello to start the conversation'}
                   </Text>
                 </View>
-                <Text style={styles.time}>{lastMessage.time}</Text>
+                {lastMessage && <Text style={styles.time}>{formatTimeLabel(lastMessage.created_at)}</Text>}
               </TouchableOpacity>
             );
           })}
@@ -46,31 +103,31 @@ export default function ConsultMainScreen({ navigation }: Props) {
       )}
 
       <Text style={styles.sectionTitle}>Available vets</Text>
-      {otherVets.map((vet) => (
-        <View key={vet.id} style={styles.vetRow}>
-          <Avatar initial={vet.initial} color={vet.color} size={48} uri={vet.photoUrl} />
-          <View style={styles.threadInfo}>
-            <Text style={styles.vetName}>{vet.name}</Text>
-            <Text style={styles.vetSpecialty}>{vet.specialty}</Text>
-          </View>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Payment', { vetId: vet.id, mode: 'chat', amount: vet.priceValue })}
-            >
-              <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
-            </TouchableOpacity>
-            {vet.supportsVideo && (
-              <TouchableOpacity
-                style={[styles.iconButton, styles.videoButton]}
-                onPress={() => navigation.navigate('Payment', { vetId: vet.id, mode: 'video', amount: vet.priceValue })}
-              >
-                <Ionicons name="videocam-outline" size={18} color={colors.accent} />
+      {otherVets.map((vet) => {
+        const view = vetToCardView(vet);
+        return (
+          <View key={vet.id} style={styles.vetRow}>
+            <Avatar initial={view.initial} color={view.color} size={48} uri={view.photoUrl} />
+            <View style={styles.threadInfo}>
+              <Text style={styles.vetName}>{view.name}</Text>
+              <Text style={styles.vetSpecialty}>{view.specialty}</Text>
+            </View>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={styles.iconButton} onPress={() => startChat(vet.id)}>
+                <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
               </TouchableOpacity>
-            )}
+              {view.supportsVideo && (
+                <TouchableOpacity
+                  style={[styles.iconButton, styles.videoButton]}
+                  onPress={() => navigation.navigate('VideoCall', { vetId: vet.id })}
+                >
+                  <Ionicons name="videocam-outline" size={18} color={colors.accent} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </ScreenContainer>
   );
 }

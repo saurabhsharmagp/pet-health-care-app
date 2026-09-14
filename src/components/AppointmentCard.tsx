@@ -1,17 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Appointment, Vet } from '../data/mockData';
 import { colors, radius, spacing } from '../theme/colors';
 import Avatar from './Avatar';
 import Badge from './Badge';
 
+type AppointmentCardAppointment = {
+  status: 'upcoming' | 'completed' | 'cancelled';
+  reason: string;
+  date: string;
+  time: string;
+  type: 'in-person' | 'video';
+};
+
+type AppointmentCardVet = {
+  initial: string;
+  color: string;
+  photoUrl?: string;
+  name: string;
+};
+
 type Props = {
-  appointment: Appointment;
-  vet: Vet;
+  appointment: AppointmentCardAppointment;
+  vet: AppointmentCardVet;
   onPress: () => void;
 };
 
-const statusTone: Record<Appointment['status'], 'success' | 'neutral' | 'danger'> = {
+const statusTone: Record<AppointmentCardAppointment['status'], 'success' | 'neutral' | 'danger'> = {
   upcoming: 'neutral',
   completed: 'success',
   cancelled: 'danger',

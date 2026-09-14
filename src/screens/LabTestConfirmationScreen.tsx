@@ -1,18 +1,55 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { labTestPackages, pets } from '../data/mockData';
+import { getLabTestBooking } from '../api/bookings';
+import { getLabTestPackage } from '../api/labTests';
+import { getPet } from '../api/pets';
+import { formatDateLabel, formatTimeLabel } from '../lib/format';
+import { LabTestBooking, LabTestPackage, Pet } from '../lib/database.types';
 import { LabTestsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<LabTestsStackParamList, 'LabTestConfirmation'>;
 
 export default function LabTestConfirmationScreen({ route, navigation }: Props) {
-  const { packageId, petId, date, time, address } = route.params;
-  const pkg = labTestPackages.find((p) => p.id === packageId)!;
-  const pet = pets.find((p) => p.id === petId)!;
+  const [booking, setBooking] = useState<LabTestBooking | null>(null);
+  const [pkg, setPkg] = useState<LabTestPackage | null>(null);
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const b = await getLabTestBooking(route.params.bookingId);
+      if (!b) {
+        setLoading(false);
+        return;
+      }
+      const [p, petData] = await Promise.all([getLabTestPackage(b.package_id), getPet(b.pet_id)]);
+      setBooking(b);
+      setPkg(p);
+      setPet(petData);
+      setLoading(false);
+    })();
+  }, [route.params.bookingId]);
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  if (!booking || !pkg || !pet) {
+    return (
+      <ScreenContainer>
+        <Text>Booking not found.</Text>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
@@ -29,10 +66,10 @@ export default function LabTestConfirmationScreen({ route, navigation }: Props) 
         <Text style={styles.pkgCategory}>{pkg.category}</Text>
         <View style={styles.divider} />
         <DetailRow icon="paw-outline" label="Pet" value={pet.name} />
-        <DetailRow icon="calendar-outline" label="Date" value={date} />
-        <DetailRow icon="time-outline" label="Time" value={time} />
-        <DetailRow icon="location-outline" label="Address" value={address} />
-        <DetailRow icon="cash-outline" label="Paid" value={`₹${pkg.price.toLocaleString('en-IN')}`} />
+        <DetailRow icon="calendar-outline" label="Date" value={formatDateLabel(booking.slot_at)} />
+        <DetailRow icon="time-outline" label="Time" value={formatTimeLabel(booking.slot_at)} />
+        <DetailRow icon="location-outline" label="Address" value={booking.address} />
+        <DetailRow icon="cash-outline" label="Amount" value={`₹${pkg.price.toLocaleString('en-IN')}`} />
       </View>
 
       <Button label="Back to Lab Tests" onPress={() => navigation.popToTop()} style={styles.button} />

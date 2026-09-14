@@ -1,26 +1,20 @@
 export type HomeStackParamList = {
   HomeMain: undefined;
   Profile: undefined;
-  VetList: { specialty?: string } | undefined;
+  AddPet: undefined;
+  VetList: undefined;
   VetDetail: { vetId: string };
   BookAppointment: { vetId: string };
-  Payment: {
+  ConfirmBooking: {
     vetId: string;
     petId: string;
-    date: string;
-    time: string;
+    slotId: string;
+    slotAt: string;
     type: 'in-person' | 'video';
     reason: string;
     amount: number;
   };
-  AppointmentConfirmation: {
-    vetId: string;
-    petId: string;
-    date: string;
-    time: string;
-    type: 'in-person' | 'video';
-    reason: string;
-  };
+  AppointmentConfirmation: { appointmentId: string };
 };
 
 export type AppointmentsStackParamList = {
@@ -31,38 +25,40 @@ export type AppointmentsStackParamList = {
 
 export type ConsultStackParamList = {
   ConsultMain: undefined;
-  Payment: { vetId: string; mode: 'chat' | 'video'; amount: number };
-  Chat: { vetId: string };
+  Chat: { threadId: string };
   VideoCall: { vetId: string };
-};
-
-export type ShopStackParamList = {
-  ShopMain: undefined;
 };
 
 export type WalkingStackParamList = {
   WalkingMain: undefined;
+  WalkerList: undefined;
+  WalkerDetail: { walkerId: string };
+  BookWalk: { walkerId: string };
+  ConfirmBooking: {
+    walkerId: string;
+    petId: string;
+    slotId: string;
+    slotAt: string;
+    durationLabel: string;
+    address: string;
+    amount: number;
+  };
+  WalkConfirmation: { walkId: string };
+  WalkDetail: { walkId: string };
 };
 
 export type LabTestsStackParamList = {
   LabTestsMain: undefined;
   LabTestDetail: { packageId: string };
   BookLabTest: { packageId: string };
-  Payment: {
+  ConfirmBooking: {
     packageId: string;
     petId: string;
-    date: string;
-    time: string;
+    slotAt: string;
     address: string;
     amount: number;
   };
-  LabTestConfirmation: {
-    packageId: string;
-    petId: string;
-    date: string;
-    time: string;
-    address: string;
-  };
+  LabTestConfirmation: { bookingId: string };
 };
 
 export type RootTabParamList = {
@@ -70,7 +66,6 @@ export type RootTabParamList = {
   Appointments: undefined;
   Consult: undefined;
   LabTests: undefined;
-  Shop: undefined;
   Walking: undefined;
 };
 
@@ -104,9 +99,41 @@ export type DoctorTabParamList = {
   Messages: undefined;
 };
 
+export type WalkerDashboardStackParamList = {
+  DashboardMain: undefined;
+  Profile: undefined;
+  WalkDetail: { walkId: string };
+  ClientDetail: { petId: string };
+};
+
+export type WalkerWalksStackParamList = {
+  WalksMain: undefined;
+  WalkDetail: { walkId: string };
+  ClientDetail: { petId: string };
+};
+
+export type WalkerClientsStackParamList = {
+  ClientsMain: undefined;
+  ClientDetail: { petId: string };
+};
+
+export type WalkerMessagesStackParamList = {
+  MessagesMain: undefined;
+  Chat: { threadId: string };
+};
+
+export type WalkerTabParamList = {
+  Dashboard: undefined;
+  Walks: undefined;
+  Clients: undefined;
+  Messages: undefined;
+};
+
+// Landing/Login are the only screens rendered when there's no session.
+// Once authenticated, RootNavigator swaps in MainTabNavigator /
+// DoctorTabNavigator / WalkerTabNavigator directly based on profile.role —
+// those aren't part of this stack, so there's nothing to navigate/reset to.
 export type RootStackParamList = {
   Landing: undefined;
   Login: { mode?: 'login' | 'signup' } | undefined;
-  MainTabs: undefined;
-  DoctorTabs: undefined;
 };

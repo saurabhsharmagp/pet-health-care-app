@@ -1,18 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { LabTestPackage } from '../data/mockData';
 import { colors, radius, spacing } from '../theme/colors';
 
+type LabTestCardPackage = {
+  name: string;
+  category: string;
+  turnaround: string | null;
+  price: number;
+  icon: string | null;
+  color: string | null;
+};
+
 type Props = {
-  labTest: LabTestPackage;
+  labTest: LabTestCardPackage;
   onPress: () => void;
 };
 
 export default function LabTestCard({ labTest, onPress }: Props) {
+  const iconColor = labTest.color ?? colors.primary;
+  const iconName = (labTest.icon ?? 'flask-outline') as keyof typeof Ionicons.glyphMap;
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onPress}>
-      <View style={[styles.iconCircle, { backgroundColor: labTest.color + '22' }]}>
-        <Ionicons name={labTest.icon as keyof typeof Ionicons.glyphMap} size={26} color={labTest.color} />
+      <View style={[styles.iconCircle, { backgroundColor: iconColor + '22' }]}>
+        <Ionicons name={iconName} size={26} color={iconColor} />
       </View>
       <View style={styles.info}>
         <Text style={styles.name}>{labTest.name}</Text>

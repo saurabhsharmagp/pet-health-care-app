@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   ImageBackground,
   ScrollView,
   StyleSheet,
@@ -13,7 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Avatar from '../components/Avatar';
 import VetCard from '../components/VetCard';
 import AppointmentCard from '../components/AppointmentCard';
-import { appointments, currentUser, pets, vets } from '../data/mockData';
+import { listMyPets } from '../api/pets';
+import { listVets, VetDirectoryEntry } from '../api/professionals';
+import { listMyAppointments } from '../api/bookings';
+import { Pet, Appointment } from '../lib/database.types';
+import { useAuth } from '../lib/AuthContext';
+import { appointmentToCardView, petToCardView, vetToCardView } from '../lib/viewModels';
 import { colors, radius, spacing } from '../theme/colors';
 import { HomeStackParamList } from '../navigation/types';
 
@@ -44,12 +51,12 @@ const quickActions: {
     onPress: (nav) => nav.getParent()?.navigate('Consult'),
   },
   {
-    key: 'shop',
-    label: 'Medicine & Toys',
-    icon: 'bag-handle-outline',
+    key: 'labs',
+    label: 'Lab Tests',
+    icon: 'flask-outline',
     bg: colors.successLight,
     fg: colors.success,
-    onPress: (nav) => nav.getParent()?.navigate('Shop'),
+    onPress: (nav) => nav.getParent()?.navigate('LabTests'),
   },
   {
     key: 'walk',
@@ -63,9 +70,46 @@ const quickActions: {
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavProp>();
-  const upcoming = appointments.find((a) => a.status === 'upcoming');
-  const upcomingVet = upcoming ? vets.find((v) => v.id === upcoming.vetId) : undefined;
-  const topVets = vets.slice(0, 2);
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [topVets, setTopVets] = useState<VetDirectoryEntry[]>([]);
+  const [upcoming, setUpcoming] = useState<Appointment | null>(null);
+  const [upcomingVet, setUpcomingVet] = useState<VetDirectoryEntry | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      let active = true;
+
+      (async () => {
+        const [myPets, vets, myAppointments] = await Promise.all([
+          listMyPets(profile.id),
+          listVets(),
+          listMyAppointments(profile.id),
+        ]);
+        if (!active) return;
+        setPets(myPets);
+        setTopVets(vets.slice(0, 2));
+
+        const nextUpcoming = myAppointments.find((a) => a.status === 'upcoming') ?? null;
+        setUpcoming(nextUpcoming);
+        if (nextUpcoming) {
+          const vet = vets.find((v) => v.id === nextUpcoming.vet_id) ?? null;
+          setUpcomingVet(vet);
+        } else {
+          setUpcomingVet(null);
+        }
+        setLoading(false);
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [profile])
+  );
+
+  if (!profile) return null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -78,70 +122,83 @@ export default function HomeScreen() {
           <View style={styles.heroOverlay} />
           <View style={styles.header}>
             <View>
-              <Text style={styles.greeting}>Hello, {currentUser.name.split(' ')[0]} 👋</Text>
+              <Text style={styles.greeting}>Hello, {profile.name.split(' ')[0]} 👋</Text>
               <Text style={styles.subGreeting}>Let's take care of your pets today</Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
               <View style={styles.avatarRing}>
-                <Avatar initial={currentUser.initial} color={colors.primary} size={44} />
+                <Avatar initial={profile.name.charAt(0).toUpperCase()} color={colors.primary} size={44} uri={profile.avatar_url ?? undefined} />
               </View>
             </TouchableOpacity>
           </View>
         </ImageBackground>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petsRow}>
-          {pets.map((pet) => (
-            <View key={pet.id} style={styles.petCard}>
-              <Avatar initial={pet.initial} color={pet.color} size={40} uri={pet.photoUrl} />
-              <Text style={styles.petName}>{pet.name}</Text>
-              <Text style={styles.petMeta}>{pet.breed} · {pet.age}</Text>
-            </View>
-          ))}
-          <TouchableOpacity style={styles.addPetCard}>
-            <Ionicons name="add" size={22} color={colors.primary} />
-            <Text style={styles.addPetText}>Add Pet</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        <Text style={styles.sectionTitle}>Quick actions</Text>
-        <View style={styles.actionsGrid}>
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.key}
-              style={styles.actionCard}
-              activeOpacity={0.75}
-              onPress={() => action.onPress(navigation)}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: action.bg }]}>
-                <Ionicons name={action.icon} size={24} color={action.fg} />
-              </View>
-              <Text style={styles.actionLabel}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {upcoming && upcomingVet && (
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        ) : (
           <>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Upcoming appointment</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petsRow}>
+              {pets.map((pet) => {
+                const view = petToCardView(pet);
+                return (
+                  <View key={pet.id} style={styles.petCard}>
+                    <Avatar initial={view.initial} color={view.color} size={40} uri={view.photoUrl} />
+                    <Text style={styles.petName}>{view.name}</Text>
+                    <Text style={styles.petMeta}>{view.breed} · {view.age}</Text>
+                  </View>
+                );
+              })}
+              <TouchableOpacity style={styles.addPetCard} onPress={() => navigation.navigate('AddPet')}>
+                <Ionicons name="add" size={22} color={colors.primary} />
+                <Text style={styles.addPetText}>Add Pet</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <Text style={styles.sectionTitle}>Quick actions</Text>
+            <View style={styles.actionsGrid}>
+              {quickActions.map((action) => (
+                <TouchableOpacity
+                  key={action.key}
+                  style={styles.actionCard}
+                  activeOpacity={0.75}
+                  onPress={() => action.onPress(navigation)}
+                >
+                  <View style={[styles.actionIcon, { backgroundColor: action.bg }]}>
+                    <Ionicons name={action.icon} size={24} color={action.fg} />
+                  </View>
+                  <Text style={styles.actionLabel}>{action.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <AppointmentCard
-              appointment={upcoming}
-              vet={upcomingVet}
-              onPress={() => navigation.navigate('VetDetail', { vetId: upcomingVet.id })}
-            />
+
+            {upcoming && upcomingVet && (
+              <>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Upcoming appointment</Text>
+                </View>
+                <AppointmentCard
+                  appointment={appointmentToCardView(upcoming)}
+                  vet={vetToCardView(upcomingVet)}
+                  onPress={() => navigation.navigate('VetDetail', { vetId: upcomingVet.id })}
+                />
+              </>
+            )}
+
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Top rated vets near you</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('VetList')}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            {topVets.map((vet) => (
+              <VetCard
+                key={vet.id}
+                vet={vetToCardView(vet)}
+                onPress={() => navigation.navigate('VetDetail', { vetId: vet.id })}
+              />
+            ))}
           </>
         )}
-
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Top rated vets near you</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('VetList')}>
-            <Text style={styles.seeAll}>See all</Text>
-          </TouchableOpacity>
-        </View>
-        {topVets.map((vet) => (
-          <VetCard key={vet.id} vet={vet} onPress={() => navigation.navigate('VetDetail', { vetId: vet.id })} />
-        ))}
       </ScrollView>
     </SafeAreaView>
   );

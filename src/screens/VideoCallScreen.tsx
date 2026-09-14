@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Avatar from '../components/Avatar';
-import { vets } from '../data/mockData';
+import { getVet, VetDirectoryEntry } from '../api/professionals';
+import { vetToCardView } from '../lib/viewModels';
 import { ConsultStackParamList } from '../navigation/types';
-import { radius, spacing } from '../theme/colors';
+import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<ConsultStackParamList, 'VideoCall'>;
 
@@ -19,11 +20,15 @@ function formatDuration(totalSeconds: number) {
 }
 
 export default function VideoCallScreen({ route, navigation }: Props) {
-  const vet = vets.find((v) => v.id === route.params.vetId)!;
+  const [vet, setVet] = useState<VetDirectoryEntry | null>(null);
   const [connected, setConnected] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+
+  useEffect(() => {
+    getVet(route.params.vetId).then(setVet);
+  }, [route.params.vetId]);
 
   useEffect(() => {
     const connectTimer = setTimeout(() => setConnected(true), 2000);
@@ -36,11 +41,21 @@ export default function VideoCallScreen({ route, navigation }: Props) {
     return () => clearInterval(interval);
   }, [connected]);
 
+  if (!vet) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ActivityIndicator color="#fff" style={{ marginTop: spacing.xl }} />
+      </SafeAreaView>
+    );
+  }
+
+  const view = vetToCardView(vet);
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.remoteArea}>
-        <Avatar initial={vet.initial} color="#ffffff" size={110} uri={vet.photoUrl} />
-        <Text style={styles.vetName}>{vet.name}</Text>
+        <Avatar initial={view.initial} color="#ffffff" size={110} uri={view.photoUrl} />
+        <Text style={styles.vetName}>{view.name}</Text>
         <Text style={styles.status}>{connected ? formatDuration(seconds) : 'Connecting...'}</Text>
       </View>
 

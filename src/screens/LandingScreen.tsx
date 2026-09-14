@@ -24,7 +24,7 @@ export default function LandingScreen({ navigation }: Props) {
             <View style={styles.brandIcon}>
               <Ionicons name="paw" size={20} color="#ffffff" />
             </View>
-            <Text style={styles.brandName}>Kenlo</Text>
+            <Text style={styles.brandName}>Kennelo</Text>
           </View>
 
           <View style={styles.spacer} />
@@ -32,7 +32,7 @@ export default function LandingScreen({ navigation }: Props) {
           <View style={styles.bottomContent}>
             <Text style={styles.headline}>Complete care for your pet</Text>
             <Text style={styles.subheadline}>
-              Vet visits, online consults, dog walking, medicine and toys — all in one app.
+              Vet visits, online consults, lab tests, and dog walking — all in one app.
             </Text>
 
             <TouchableOpacity
@@ -53,7 +53,7 @@ export default function LandingScreen({ navigation }: Props) {
               </Text>
             </TouchableOpacity>
 
-            <Text style={styles.legal}>By continuing you agree to Kenlo's Terms & Privacy Policy</Text>
+            <Text style={styles.legal}>By continuing you agree to Kennelo's Terms & Privacy Policy</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>

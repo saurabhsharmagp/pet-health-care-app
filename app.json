@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Kenlo",
-    "slug": "kenlo",
+    "name": "Kennelo",
+    "slug": "kennelo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,7 +22,7 @@
       "favicon": "./assets/favicon.png"
     },
     "experiments": {
-      "baseUrl": "/pet-health-care-app"
+      "baseUrl": "/pet-health-care-app/app"
     }
   }
 }

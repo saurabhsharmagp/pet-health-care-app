@@ -1,18 +1,38 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { vets } from '../data/mockData';
+import { getVet, getVetSlots, SlotGroup, VetDirectoryEntry } from '../api/professionals';
+import { vetToCardView } from '../lib/viewModels';
 import { HomeStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'VetDetail'>;
 
 export default function VetDetailScreen({ route, navigation }: Props) {
-  const vet = vets.find((v) => v.id === route.params.vetId);
+  const [vet, setVet] = useState<VetDirectoryEntry | null>(null);
+  const [slots, setSlots] = useState<SlotGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([getVet(route.params.vetId), getVetSlots(route.params.vetId)]).then(([v, s]) => {
+      setVet(v);
+      setSlots(s);
+      setLoading(false);
+    });
+  }, [route.params.vetId]);
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
 
   if (!vet) {
     return (
@@ -22,56 +42,62 @@ export default function VetDetailScreen({ route, navigation }: Props) {
     );
   }
 
+  const view = vetToCardView(vet);
+
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Avatar initial={vet.initial} color={vet.color} size={72} uri={vet.photoUrl} />
-        <Text style={styles.name}>{vet.name}</Text>
-        <Text style={styles.specialty}>{vet.specialty}</Text>
+        <Avatar initial={view.initial} color={view.color} size={72} uri={view.photoUrl} />
+        <Text style={styles.name}>{view.name}</Text>
+        <Text style={styles.specialty}>{view.specialty}</Text>
         <View style={styles.badgeRow}>
-          <Badge label={`⭐ ${vet.rating} (${vet.reviewsCount})`} />
-          <Badge label={vet.priceLabel} tone="success" />
-          {vet.supportsVideo && <Badge label="Video available" tone="warning" />}
+          <Badge label={`⭐ ${view.rating} (${view.reviewsCount})`} />
+          <Badge label={view.priceLabel} tone="success" />
+          {view.supportsVideo && <Badge label="Video available" tone="warning" />}
         </View>
       </View>
 
       <View style={styles.infoCard}>
         <View style={styles.infoRow}>
           <Ionicons name="business-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.infoText}>{vet.clinic}</Text>
+          <Text style={styles.infoText}>{view.clinic}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="location-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.infoText}>{vet.distanceKm} km away</Text>
+          <Text style={styles.infoText}>{view.distanceKm} km away</Text>
         </View>
       </View>
 
       <Text style={styles.sectionTitle}>About</Text>
-      <Text style={styles.bio}>{vet.bio}</Text>
+      <Text style={styles.bio}>{view.bio}</Text>
 
       <Text style={styles.sectionTitle}>Next available slots</Text>
-      {vet.availableSlots.map((slot) => (
-        <View key={slot.date} style={styles.slotRow}>
-          <Text style={styles.slotDate}>{slot.date}</Text>
-          <View style={styles.slotTimes}>
-            {slot.times.map((time) => (
-              <View key={time} style={styles.timePill}>
-                <Text style={styles.timeText}>{time}</Text>
-              </View>
-            ))}
+      {slots.length === 0 ? (
+        <Text style={styles.emptyText}>No upcoming slots — check back soon.</Text>
+      ) : (
+        slots.map((slot) => (
+          <View key={slot.date} style={styles.slotRow}>
+            <Text style={styles.slotDate}>{slot.date}</Text>
+            <View style={styles.slotTimes}>
+              {slot.times.map((time) => (
+                <View key={time.id} style={styles.timePill}>
+                  <Text style={styles.timeText}>{time.label}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-      ))}
+        ))
+      )}
 
       <View style={styles.actions}>
-        {vet.supportsVideo && (
+        {view.supportsVideo && (
           <Button
             label="Video Consult"
             variant="outline"
             onPress={() =>
               navigation.getParent()?.navigate('Consult', {
-                screen: 'Payment',
-                params: { vetId: vet.id, mode: 'video', amount: vet.priceValue },
+                screen: 'VideoCall',
+                params: { vetId: vet.id },
               } as never)
             }
             style={styles.actionButton}
@@ -139,6 +165,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: colors.textMuted,
     marginBottom: spacing.lg,
   },
   slotRow: {

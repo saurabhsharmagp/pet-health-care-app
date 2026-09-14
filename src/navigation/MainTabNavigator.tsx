@@ -5,8 +5,7 @@ import AppointmentsStackNavigator from './AppointmentsStackNavigator';
 import ConsultStackNavigator from './ConsultStackNavigator';
 import HomeStackNavigator from './HomeStackNavigator';
 import LabTestsStackNavigator from './LabTestsStackNavigator';
-import ShopScreen from '../screens/ShopScreen';
-import WalkingScreen from '../screens/WalkingScreen';
+import WalkingStackNavigator from './WalkingStackNavigator';
 import { colors } from '../theme/colors';
 import { RootTabParamList } from './types';
 
@@ -17,7 +16,6 @@ const iconMap: Record<keyof RootTabParamList, keyof typeof Ionicons.glyphMap> = 
   Appointments: 'calendar',
   Consult: 'chatbubbles',
   LabTests: 'flask',
-  Shop: 'bag-handle',
   Walking: 'paw',
 };
 
@@ -58,8 +56,7 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen name="LabTests" component={LabTestsStackNavigator} options={{ headerShown: false, title: 'Labs' }} />
-      <Tab.Screen name="Shop" component={ShopScreen} options={{ title: 'Shop' }} />
-      <Tab.Screen name="Walking" component={WalkingScreen} options={{ title: 'Walking' }} />
+      <Tab.Screen name="Walking" component={WalkingStackNavigator} options={{ headerShown: false, title: 'Walking' }} />
     </Tab.Navigator>
   );
 }

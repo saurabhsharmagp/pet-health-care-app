@@ -1,12 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Owner, Pet } from '../data/mockData';
 import { colors, radius, spacing } from '../theme/colors';
 import Avatar from './Avatar';
 
+type PatientCardPet = {
+  initial: string;
+  color: string;
+  photoUrl?: string;
+  name: string;
+  species: string;
+  breed: string;
+};
+
+type PatientCardOwner = {
+  name: string;
+};
+
 type Props = {
-  pet: Pet;
-  owner: Owner;
+  pet: PatientCardPet;
+  owner: PatientCardOwner;
   lastVisit?: string;
   onPress: () => void;
 };

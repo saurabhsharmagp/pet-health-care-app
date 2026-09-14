@@ -1,20 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import VetCard from '../components/VetCard';
-import { vets } from '../data/mockData';
+import { listVets, VetDirectoryEntry } from '../api/professionals';
+import { vetToCardView } from '../lib/viewModels';
 import { colors, radius, spacing } from '../theme/colors';
 import { HomeStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'VetList'>;
 
-const specialties = ['All', 'General & Preventive Care', 'Dermatology', 'Surgery & Orthopedics', 'Nutrition & Wellness'];
-
-export default function VetListScreen({ navigation, route }: Props) {
+export default function VetListScreen({ navigation }: Props) {
   const [query, setQuery] = useState('');
-  const [activeSpecialty, setActiveSpecialty] = useState(route.params?.specialty ?? 'All');
+  const [activeSpecialty, setActiveSpecialty] = useState('All');
+  const [vets, setVets] = useState<VetDirectoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listVets().then((data) => {
+      setVets(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const specialties = useMemo(() => ['All', ...new Set(vets.map((v) => v.specialty))], [vets]);
 
   const filtered = useMemo(() => {
     return vets.filter((vet) => {
@@ -25,7 +35,7 @@ export default function VetListScreen({ navigation, route }: Props) {
         vet.clinic.toLowerCase().includes(query.toLowerCase());
       return matchesSpecialty && matchesQuery;
     });
-  }, [query, activeSpecialty]);
+  }, [vets, query, activeSpecialty]);
 
   return (
     <ScreenContainer>
@@ -57,11 +67,20 @@ export default function VetListScreen({ navigation, route }: Props) {
         })}
       </View>
 
-      <Text style={styles.resultsText}>{filtered.length} vets available</Text>
-
-      {filtered.map((vet) => (
-        <VetCard key={vet.id} vet={vet} onPress={() => navigation.navigate('VetDetail', { vetId: vet.id })} />
-      ))}
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      ) : (
+        <>
+          <Text style={styles.resultsText}>{filtered.length} vets available</Text>
+          {filtered.map((vet) => (
+            <VetCard
+              key={vet.id}
+              vet={vetToCardView(vet)}
+              onPress={() => navigation.navigate('VetDetail', { vetId: vet.id })}
+            />
+          ))}
+        </>
+      )}
     </ScreenContainer>
   );
 }

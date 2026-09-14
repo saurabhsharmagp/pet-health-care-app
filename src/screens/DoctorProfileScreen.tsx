@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import ScreenContainer from '../components/ScreenContainer';
-import { DOCTOR_VET_ID, vets } from '../data/mockData';
+import { getVet, VetDirectoryEntry } from '../api/professionals';
+import { useAuth } from '../lib/AuthContext';
+import { vetToCardView } from '../lib/viewModels';
 import { DoctorDashboardStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -18,25 +21,34 @@ const menuItems: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
   { icon: 'help-circle-outline', label: 'Help & support' },
 ];
 
-export default function DoctorProfileScreen({ navigation }: Props) {
-  const doctor = vets.find((v) => v.id === DOCTOR_VET_ID)!;
+export default function DoctorProfileScreen({}: Props) {
+  const { profile, signOut } = useAuth();
+  const [vet, setVet] = useState<VetDirectoryEntry | null>(null);
 
-  const handleLogout = () => {
-    (navigation.getParent()?.getParent() as any)?.reset({
-      index: 0,
-      routes: [{ name: 'Landing' }],
-    });
-  };
+  useEffect(() => {
+    if (!profile) return;
+    getVet(profile.id).then(setVet);
+  }, [profile]);
+
+  if (!profile || !vet) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  const view = vetToCardView(vet);
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Avatar initial={doctor.initial} color={doctor.color} size={72} uri={doctor.photoUrl} />
-        <Text style={styles.name}>{doctor.name}</Text>
-        <Text style={styles.specialty}>{doctor.specialty}</Text>
+        <Avatar initial={view.initial} color={view.color} size={72} uri={view.photoUrl} />
+        <Text style={styles.name}>{view.name}</Text>
+        <Text style={styles.specialty}>{view.specialty}</Text>
         <View style={styles.badgeRow}>
-          <Badge label={`⭐ ${doctor.rating} (${doctor.reviewsCount})`} />
-          <Badge label={doctor.clinic} tone="neutral" />
+          <Badge label={`⭐ ${view.rating} (${view.reviewsCount})`} />
+          <Badge label={view.clinic} tone="neutral" />
         </View>
       </View>
 
@@ -54,7 +66,7 @@ export default function DoctorProfileScreen({ navigation }: Props) {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
         <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
     </ScreenContainer>

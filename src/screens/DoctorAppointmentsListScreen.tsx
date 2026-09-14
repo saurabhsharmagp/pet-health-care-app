@@ -1,13 +1,21 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DoctorAppointmentCard from '../components/DoctorAppointmentCard';
 import ScreenContainer from '../components/ScreenContainer';
-import { DOCTOR_VET_ID, appointments, owners, pets } from '../data/mockData';
+import { listVetAppointments } from '../api/bookings';
+import { getPet } from '../api/pets';
+import { getProfile } from '../api/profiles';
+import { useAuth } from '../lib/AuthContext';
+import { Appointment, Pet, Profile } from '../lib/database.types';
+import { appointmentToCardView, petToCardView } from '../lib/viewModels';
 import { DoctorAppointmentsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<DoctorAppointmentsStackParamList, 'AppointmentsMain'>;
+
+type Row = { appointment: Appointment; pet: Pet; owner: Profile };
 
 const tabs: { key: 'upcoming' | 'past'; label: string }[] = [
   { key: 'upcoming', label: 'Upcoming' },
@@ -15,16 +23,39 @@ const tabs: { key: 'upcoming' | 'past'; label: string }[] = [
 ];
 
 export default function DoctorAppointmentsListScreen({ navigation }: Props) {
+  const { profile } = useAuth();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<Row[]>([]);
 
-  const doctorAppointments = useMemo(
-    () => appointments.filter((a) => a.vetId === DOCTOR_VET_ID),
-    []
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      let active = true;
+      (async () => {
+        const appointments = await listVetAppointments(profile.id);
+        const built = await Promise.all(
+          appointments.map(async (appointment) => {
+            const pet = await getPet(appointment.pet_id);
+            if (!pet) return null;
+            const owner = await getProfile(pet.owner_id);
+            if (!owner) return null;
+            return { appointment, pet, owner };
+          })
+        );
+        if (!active) return;
+        setRows(built.filter((r): r is Row => r !== null));
+        setLoading(false);
+      })();
+      return () => {
+        active = false;
+      };
+    }, [profile])
   );
 
   const filtered = useMemo(
-    () => doctorAppointments.filter((a) => (tab === 'upcoming' ? a.status === 'upcoming' : a.status !== 'upcoming')),
-    [tab, doctorAppointments]
+    () => rows.filter((r) => (tab === 'upcoming' ? r.appointment.status === 'upcoming' : r.appointment.status !== 'upcoming')),
+    [tab, rows]
   );
 
   return (
@@ -46,24 +77,22 @@ export default function DoctorAppointmentsListScreen({ navigation }: Props) {
         })}
       </View>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      ) : filtered.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No {tab} appointments.</Text>
         </View>
       ) : (
-        filtered.map((appointment) => {
-          const pet = pets.find((p) => p.id === appointment.petId)!;
-          const owner = owners.find((o) => o.id === pet.ownerId)!;
-          return (
-            <DoctorAppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-              pet={pet}
-              owner={owner}
-              onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: appointment.id })}
-            />
-          );
-        })
+        filtered.map(({ appointment, pet, owner }) => (
+          <DoctorAppointmentCard
+            key={appointment.id}
+            appointment={appointmentToCardView(appointment)}
+            pet={petToCardView(pet)}
+            owner={{ name: owner.name }}
+            onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: appointment.id })}
+          />
+        ))
       )}
     </ScreenContainer>
   );

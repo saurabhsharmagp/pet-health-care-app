@@ -1,9 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import Avatar from '../components/Avatar';
-import { currentUser, pets } from '../data/mockData';
+import { listMyPets } from '../api/pets';
+import { Pet } from '../lib/database.types';
+import { useAuth } from '../lib/AuthContext';
+import { colorForId, initialFor } from '../lib/avatarStyle';
 import { HomeStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -18,34 +23,50 @@ const menuItems: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
 type Props = NativeStackScreenProps<HomeStackParamList, 'Profile'>;
 
 export default function ProfileScreen({ navigation }: Props) {
-  const handleLogout = () => {
-    (navigation.getParent()?.getParent() as any)?.reset({
-      index: 0,
-      routes: [{ name: 'Landing' }],
-    });
-  };
+  const { profile, signOut } = useAuth();
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      let active = true;
+      listMyPets(profile.id)
+        .then((data) => active && setPets(data))
+        .finally(() => active && setLoading(false));
+      return () => {
+        active = false;
+      };
+    }, [profile])
+  );
+
+  if (!profile) return null;
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Avatar initial={currentUser.initial} color={colors.primary} size={72} />
-        <Text style={styles.name}>{currentUser.name}</Text>
-        <Text style={styles.email}>{currentUser.email}</Text>
+        <Avatar initial={initialFor(profile.name)} color={colors.primary} size={72} uri={profile.avatar_url ?? undefined} />
+        <Text style={styles.name}>{profile.name}</Text>
+        <Text style={styles.email}>{profile.email}</Text>
       </View>
 
       <Text style={styles.sectionTitle}>My Pets</Text>
-      {pets.map((pet) => (
-        <View key={pet.id} style={styles.petRow}>
-          <Avatar initial={pet.initial} color={pet.color} size={44} uri={pet.photoUrl} />
-          <View style={styles.petInfo}>
-            <Text style={styles.petName}>{pet.name}</Text>
-            <Text style={styles.petMeta}>
-              {pet.species} · {pet.breed} · {pet.age} · {pet.weightKg} kg
-            </Text>
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginBottom: spacing.md }} />
+      ) : (
+        pets.map((pet) => (
+          <View key={pet.id} style={styles.petRow}>
+            <Avatar initial={initialFor(pet.name)} color={colorForId(pet.id)} size={44} uri={pet.photo_url ?? undefined} />
+            <View style={styles.petInfo}>
+              <Text style={styles.petName}>{pet.name}</Text>
+              <Text style={styles.petMeta}>
+                {pet.species} · {pet.breed} · {pet.age} · {pet.weight_kg} kg
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
-      <TouchableOpacity style={styles.addPetButton}>
+        ))
+      )}
+      <TouchableOpacity style={styles.addPetButton} onPress={() => navigation.navigate('AddPet')}>
         <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
         <Text style={styles.addPetText}>Add another pet</Text>
       </TouchableOpacity>
@@ -64,7 +85,7 @@ export default function ProfileScreen({ navigation }: Props) {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
         <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
     </ScreenContainer>

@@ -1,29 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { labTestPackages } from '../data/mockData';
+import { getLabTestPackage } from '../api/labTests';
+import { LabTestPackage } from '../lib/database.types';
 import { LabTestsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<LabTestsStackParamList, 'LabTestDetail'>;
 
 export default function LabTestDetailScreen({ route, navigation }: Props) {
-  const pkg = labTestPackages.find((p) => p.id === route.params.packageId)!;
+  const [pkg, setPkg] = useState<LabTestPackage | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getLabTestPackage(route.params.packageId).then((data) => {
+      setPkg(data);
+      setLoading(false);
+    });
+  }, [route.params.packageId]);
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  if (!pkg) {
+    return (
+      <ScreenContainer>
+        <Text>Test package not found.</Text>
+      </ScreenContainer>
+    );
+  }
+
+  const iconColor = pkg.color ?? colors.primary;
+  const iconName = (pkg.icon ?? 'flask-outline') as keyof typeof Ionicons.glyphMap;
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <View style={[styles.iconCircle, { backgroundColor: pkg.color + '22' }]}>
-          <Ionicons name={pkg.icon as keyof typeof Ionicons.glyphMap} size={36} color={pkg.color} />
+        <View style={[styles.iconCircle, { backgroundColor: iconColor + '22' }]}>
+          <Ionicons name={iconName} size={36} color={iconColor} />
         </View>
         <Text style={styles.name}>{pkg.name}</Text>
         <Text style={styles.category}>{pkg.category}</Text>
         <View style={styles.badgeRow}>
           <Badge label={`₹${pkg.price.toLocaleString('en-IN')}`} tone="success" />
-          <Badge label={pkg.turnaround} />
+          {pkg.turnaround && <Badge label={pkg.turnaround} />}
           {pkg.fasting && <Badge label="Fasting required" tone="warning" />}
         </View>
       </View>
@@ -33,7 +62,7 @@ export default function LabTestDetailScreen({ route, navigation }: Props) {
 
       <Text style={styles.sectionTitle}>What's included</Text>
       <View style={styles.includedCard}>
-        {pkg.includedTests.map((test) => (
+        {pkg.included_tests.map((test) => (
           <View key={test} style={styles.includedRow}>
             <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
             <Text style={styles.includedText}>{test}</Text>

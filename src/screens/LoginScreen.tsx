@@ -13,24 +13,55 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
+import { useAuth } from '../lib/AuthContext';
 import { RootStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
+// Seeded by scripts/seed-demo-data.mjs — real accounts, safe to show publicly
+// since they're clearly labeled as demo logins.
+const DEMO_PASSWORD = 'Kennelo!Demo123';
+const DEMO_OWNER_EMAIL = 'saurabhsharmagp@yahoo.com';
+const DEMO_VET_EMAIL = 'dr.anjali.rao@kennelo.demo';
+const DEMO_WALKER_EMAIL = 'aditya.bose@kennelo.demo';
+
 export default function LoginScreen({ navigation, route }: Props) {
-  const [role, setRole] = useState<'owner' | 'vet'>('owner');
+  const { signIn, signUp } = useAuth();
+  const [role, setRole] = useState<'owner' | 'vet' | 'walker'>('owner');
   const [mode, setMode] = useState<'login' | 'signup'>(route.params?.mode ?? 'login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const isVet = role === 'vet';
-  const isSignup = mode === 'signup';
+  const isWalker = role === 'walker';
+  const isProfessional = isVet || isWalker;
+  const isSignup = mode === 'signup' && !isProfessional;
   const canSubmit = email.trim().length > 0 && password.trim().length > 0 && (!isSignup || name.trim().length > 0);
 
-  const enterApp = () => {
-    navigation.reset({ index: 0, routes: [{ name: isVet ? 'DoctorTabs' : 'MainTabs' }] });
+  const handleSubmit = async () => {
+    if (!canSubmit || submitting) return;
+    setError(null);
+    setSubmitting(true);
+    const result = isSignup
+      ? await signUp({ email: email.trim(), password, name: name.trim() })
+      : await signIn(email.trim(), password);
+    setSubmitting(false);
+    if (result.error) setError(result.error);
+    // On success, AuthContext picks up the new session and RootNavigator
+    // swaps to the right portal automatically — nothing to navigate here.
+  };
+
+  const handleDemoLogin = async () => {
+    setError(null);
+    setSubmitting(true);
+    const demoEmail = isVet ? DEMO_VET_EMAIL : isWalker ? DEMO_WALKER_EMAIL : DEMO_OWNER_EMAIL;
+    const result = await signIn(demoEmail, DEMO_PASSWORD);
+    setSubmitting(false);
+    if (result.error) setError(result.error);
   };
 
   return (
@@ -45,51 +76,87 @@ export default function LoginScreen({ navigation, route }: Props) {
             <View style={styles.brandIcon}>
               <Ionicons name="paw" size={20} color="#ffffff" />
             </View>
-            <Text style={styles.brandName}>Kenlo</Text>
+            <Text style={styles.brandName}>Kennelo</Text>
           </View>
 
           <View style={styles.roleRow}>
             <TouchableOpacity
-              style={[styles.roleCard, !isVet && styles.roleCardActive]}
-              onPress={() => setRole('owner')}
+              style={[styles.roleCard, role === 'owner' && styles.roleCardActive]}
+              onPress={() => {
+                setRole('owner');
+                setError(null);
+              }}
             >
-              <Ionicons name="paw-outline" size={20} color={!isVet ? colors.primary : colors.textMuted} />
-              <Text style={[styles.roleText, !isVet && styles.roleTextActive]}>Pet Owner</Text>
+              <Ionicons name="paw-outline" size={20} color={role === 'owner' ? colors.primary : colors.textMuted} />
+              <Text style={[styles.roleText, role === 'owner' && styles.roleTextActive]}>Pet Owner</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.roleCard, isVet && styles.roleCardActive]}
-              onPress={() => setRole('vet')}
+              onPress={() => {
+                setRole('vet');
+                setMode('login');
+                setError(null);
+              }}
             >
               <Ionicons name="medkit-outline" size={20} color={isVet ? colors.primary : colors.textMuted} />
               <Text style={[styles.roleText, isVet && styles.roleTextActive]}>Vet</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.roleCard, isWalker && styles.roleCardActive]}
+              onPress={() => {
+                setRole('walker');
+                setMode('login');
+                setError(null);
+              }}
+            >
+              <Ionicons name="walk-outline" size={20} color={isWalker ? colors.primary : colors.textMuted} />
+              <Text style={[styles.roleText, isWalker && styles.roleTextActive]}>Walker</Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.title}>
-            {isVet ? 'Doctor Login' : isSignup ? 'Create your account' : 'Welcome back'}
+            {isVet ? 'Doctor Login' : isWalker ? 'Walker Login' : isSignup ? 'Create your account' : 'Welcome back'}
           </Text>
           <Text style={styles.subtitle}>
             {isVet
               ? 'Access your schedule, patients, and messages.'
+              : isWalker
+              ? 'Access your walks, clients, and messages.'
               : isSignup
               ? 'Sign up to start booking vet visits and caring for your pets.'
               : 'Log in to manage your pets and appointments.'}
           </Text>
 
-          <View style={styles.tabRow}>
-            <TouchableOpacity
-              style={[styles.tab, !isSignup && styles.tabActive]}
-              onPress={() => setMode('login')}
-            >
-              <Text style={[styles.tabText, !isSignup && styles.tabTextActive]}>Log In</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, isSignup && styles.tabActive]}
-              onPress={() => setMode('signup')}
-            >
-              <Text style={[styles.tabText, isSignup && styles.tabTextActive]}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
+          {isProfessional ? (
+            <View style={styles.professionalNote}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+              <Text style={styles.professionalNoteText}>
+                Vet and walker accounts are set up by the Kennelo team after background checks — log in with the
+                credentials you were given.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.tabRow}>
+              <TouchableOpacity
+                style={[styles.tab, !isSignup && styles.tabActive]}
+                onPress={() => {
+                  setMode('login');
+                  setError(null);
+                }}
+              >
+                <Text style={[styles.tabText, !isSignup && styles.tabTextActive]}>Log In</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, isSignup && styles.tabActive]}
+                onPress={() => {
+                  setMode('signup');
+                  setError(null);
+                }}
+              >
+                <Text style={[styles.tabText, isSignup && styles.tabTextActive]}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {isSignup && (
             <View style={styles.field}>
@@ -129,16 +196,23 @@ export default function LoginScreen({ navigation, route }: Props) {
             />
           </View>
 
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
           <Button
-            label={isVet ? 'Log In' : isSignup ? 'Create Account' : 'Log In'}
-            onPress={enterApp}
-            disabled={!canSubmit}
+            label={isSignup ? 'Create Account' : 'Log In'}
+            onPress={handleSubmit}
+            disabled={!canSubmit || submitting}
+            loading={submitting}
             style={styles.submitButton}
           />
 
-          <TouchableOpacity style={styles.guestButton} onPress={enterApp}>
+          <TouchableOpacity style={styles.guestButton} onPress={handleDemoLogin} disabled={submitting}>
             <Text style={styles.guestButtonText}>
-              {isVet ? 'Continue as Dr. Anjali Rao (Demo)' : 'Continue as Guest'}
+              {isVet
+                ? 'Continue as Dr. Anjali Rao (Demo)'
+                : isWalker
+                ? 'Continue as Aditya Bose (Demo)'
+                : 'Continue as Saurabh Sharma (Demo)'}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -196,10 +270,10 @@ const styles = StyleSheet.create({
   },
   roleCard: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     paddingVertical: 12,
     borderRadius: radius.md,
     borderWidth: 1.5,
@@ -211,7 +285,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
   },
   roleText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textMuted,
   },
@@ -229,6 +303,22 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: spacing.lg,
     lineHeight: 20,
+  },
+  professionalNote: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  professionalNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textMuted,
+    lineHeight: 17,
   },
   tabRow: {
     flexDirection: 'row',
@@ -274,6 +364,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: colors.text,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: spacing.md,
   },
   submitButton: {
     marginTop: spacing.sm,

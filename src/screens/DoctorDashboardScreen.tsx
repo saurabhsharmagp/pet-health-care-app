@@ -1,85 +1,121 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Avatar from '../components/Avatar';
 import DoctorAppointmentCard from '../components/DoctorAppointmentCard';
-import RevenueBarChart from '../components/RevenueBarChart';
 import StatTile from '../components/StatTile';
-import { DOCTOR_VET_ID, appointments, doctorRevenue, owners, pets, vets } from '../data/mockData';
+import { listVetAppointments } from '../api/bookings';
+import { getPet } from '../api/pets';
+import { getProfile } from '../api/profiles';
+import { useAuth } from '../lib/AuthContext';
+import { Appointment, Pet, Profile } from '../lib/database.types';
+import { appointmentToCardView, petToCardView } from '../lib/viewModels';
 import { DoctorDashboardStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<DoctorDashboardStackParamList, 'DashboardMain'>;
 
-export default function DoctorDashboardScreen({ navigation }: Props) {
-  const doctor = vets.find((v) => v.id === DOCTOR_VET_ID)!;
-  const doctorAppointments = appointments.filter((a) => a.vetId === DOCTOR_VET_ID);
-  const upcoming = doctorAppointments.filter((a) => a.status === 'upcoming');
-  const uniquePatients = new Set(doctorAppointments.map((a) => a.petId));
+type UpcomingRow = { appointment: Appointment; pet: Pet; owner: Profile };
 
-  const currentMonth = doctorRevenue[doctorRevenue.length - 1];
-  const previousMonth = doctorRevenue[doctorRevenue.length - 2];
-  const changePct = Math.round(((currentMonth.amount - previousMonth.amount) / previousMonth.amount) * 100);
+export default function DoctorDashboardScreen({ navigation }: Props) {
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [upcomingRows, setUpcomingRows] = useState<UpcomingRow[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      let active = true;
+      (async () => {
+        const all = await listVetAppointments(profile.id);
+        if (!active) return;
+        setAppointments(all);
+
+        const upcoming = all.filter((a) => a.status === 'upcoming').slice(0, 3);
+        const rows = await Promise.all(
+          upcoming.map(async (appointment) => {
+            const pet = await getPet(appointment.pet_id);
+            if (!pet) return null;
+            const owner = await getProfile(pet.owner_id);
+            if (!owner) return null;
+            return { appointment, pet, owner };
+          })
+        );
+        if (!active) return;
+        setUpcomingRows(rows.filter((r): r is UpcomingRow => r !== null));
+        setLoading(false);
+      })();
+      return () => {
+        active = false;
+      };
+    }, [profile])
+  );
+
+  if (!profile) return null;
+
+  const upcomingCount = appointments.filter((a) => a.status === 'upcoming').length;
+  const uniquePatients = new Set(appointments.map((a) => a.pet_id));
+  const now = new Date();
+  const thisMonthCount = appointments.filter((a) => {
+    const d = new Date(a.slot_at);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hello, {doctor.name} 👋</Text>
-            <Text style={styles.subGreeting}>{doctor.specialty}</Text>
+            <Text style={styles.greeting}>Hello, {profile.name} 👋</Text>
+            <Text style={styles.subGreeting}>Your practice at a glance</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-            <Avatar initial={doctor.initial} color={doctor.color} size={44} uri={doctor.photoUrl} />
+            <Avatar initial={profile.name.charAt(0).toUpperCase()} color={colors.primary} size={44} uri={profile.avatar_url ?? undefined} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <StatTile icon="people-outline" label="Patients" value={String(uniquePatients.size)} />
-          <StatTile icon="calendar-outline" label="Upcoming" value={String(upcoming.length)} color={colors.accent} />
-          <StatTile icon="checkmark-done-outline" label="This month" value={String(currentMonth.appointments)} color={colors.success} />
-        </View>
-
-        <View style={styles.revenueCard}>
-          <View style={styles.revenueHeader}>
-            <View>
-              <Text style={styles.revenueLabel}>Revenue this month</Text>
-              <Text style={styles.revenueValue}>₹{currentMonth.amount.toLocaleString('en-IN')}</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        ) : (
+          <>
+            <View style={styles.statsRow}>
+              <StatTile icon="people-outline" label="Patients" value={String(uniquePatients.size)} />
+              <StatTile icon="calendar-outline" label="Upcoming" value={String(upcomingCount)} color={colors.accent} />
+              <StatTile icon="checkmark-done-outline" label="This month" value={String(thisMonthCount)} color={colors.success} />
             </View>
-            <View style={[styles.changeBadge, changePct >= 0 ? styles.changeUp : styles.changeDown]}>
-              <Ionicons name={changePct >= 0 ? 'trending-up' : 'trending-down'} size={14} color={changePct >= 0 ? colors.success : colors.danger} />
-              <Text style={[styles.changeText, { color: changePct >= 0 ? colors.success : colors.danger }]}>
-                {Math.abs(changePct)}%
+
+            <View style={styles.noticeCard}>
+              <Ionicons name="cash-outline" size={18} color={colors.textMuted} />
+              <Text style={styles.noticeText}>
+                Revenue tracking will appear here once online payments are enabled.
               </Text>
             </View>
-          </View>
-          <RevenueBarChart data={doctorRevenue} />
-        </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Upcoming appointments</Text>
-          <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Appointments' as never)}>
-            <Text style={styles.seeAll}>See all</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Upcoming appointments</Text>
+              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Appointments' as never)}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
 
-        {upcoming.length === 0 ? (
-          <Text style={styles.emptyText}>No upcoming appointments.</Text>
-        ) : (
-          upcoming.slice(0, 3).map((appointment) => {
-            const pet = pets.find((p) => p.id === appointment.petId)!;
-            const owner = owners.find((o) => o.id === pet.ownerId)!;
-            return (
-              <DoctorAppointmentCard
-                key={appointment.id}
-                appointment={appointment}
-                pet={pet}
-                owner={owner}
-                onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: appointment.id })}
-              />
-            );
-          })
+            {upcomingRows.length === 0 ? (
+              <Text style={styles.emptyText}>No upcoming appointments.</Text>
+            ) : (
+              upcomingRows.map(({ appointment, pet, owner }) => (
+                <DoctorAppointmentCard
+                  key={appointment.id}
+                  appointment={appointmentToCardView(appointment)}
+                  pet={petToCardView(pet)}
+                  owner={{ name: owner.name }}
+                  onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: appointment.id })}
+                />
+              ))
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -117,7 +153,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  revenueCard: {
+  noticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: colors.card,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -125,39 +164,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  revenueHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  revenueLabel: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontWeight: '600',
-  },
-  revenueValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
-    marginTop: 4,
-  },
-  changeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  changeUp: {
-    backgroundColor: colors.successLight,
-  },
-  changeDown: {
-    backgroundColor: colors.dangerLight,
-  },
-  changeText: {
+  noticeText: {
+    flex: 1,
     fontSize: 12,
-    fontWeight: '800',
+    color: colors.textMuted,
+    lineHeight: 17,
   },
   sectionHeaderRow: {
     flexDirection: 'row',

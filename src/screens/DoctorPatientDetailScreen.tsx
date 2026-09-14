@@ -1,11 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import { DOCTOR_VET_ID, appointments, doctorThreads, owners, pets } from '../data/mockData';
+import { listVetAppointments } from '../api/bookings';
+import { getOrCreateThread } from '../api/chat';
+import { getPet } from '../api/pets';
+import { getProfile } from '../api/profiles';
+import { useAuth } from '../lib/AuthContext';
+import { Appointment, Pet, Profile } from '../lib/database.types';
+import { formatDateLabel, formatTimeLabel } from '../lib/format';
+import { petToCardView } from '../lib/viewModels';
 import { DoctorPatientsStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -18,20 +26,67 @@ const statusTone: Record<string, 'success' | 'neutral' | 'danger'> = {
 };
 
 export default function DoctorPatientDetailScreen({ route, navigation }: Props) {
-  const pet = pets.find((p) => p.id === route.params.petId)!;
-  const owner = owners.find((o) => o.id === pet.ownerId)!;
-  const visits = appointments
-    .filter((a) => a.petId === pet.id && a.vetId === DOCTOR_VET_ID)
-    .slice()
-    .reverse();
-  const thread = doctorThreads.find((t) => t.petId === pet.id && t.vetId === DOCTOR_VET_ID);
+  const { profile } = useAuth();
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [owner, setOwner] = useState<Profile | null>(null);
+  const [visits, setVisits] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [messaging, setMessaging] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    (async () => {
+      const p = await getPet(route.params.petId);
+      if (!p) {
+        setLoading(false);
+        return;
+      }
+      const [o, appointments] = await Promise.all([getProfile(p.owner_id), listVetAppointments(profile.id)]);
+      setPet(p);
+      setOwner(o);
+      setVisits(
+        appointments
+          .filter((a) => a.pet_id === p.id)
+          .sort((a, b) => b.slot_at.localeCompare(a.slot_at))
+      );
+      setLoading(false);
+    })();
+  }, [route.params.petId, profile]);
+
+  const handleMessageOwner = async () => {
+    if (!profile || !pet || !owner || messaging) return;
+    setMessaging(true);
+    const thread = await getOrCreateThread(owner.id, profile.id, pet.id);
+    setMessaging(false);
+    navigation.getParent()?.navigate('Messages', { screen: 'Chat', params: { threadId: thread.id } } as never);
+  };
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </ScreenContainer>
+    );
+  }
+
+  if (!pet || !owner) {
+    return (
+      <ScreenContainer>
+        <Text>Patient not found.</Text>
+      </ScreenContainer>
+    );
+  }
+
+  const view = petToCardView(pet);
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Avatar initial={pet.initial} color={pet.color} size={76} uri={pet.photoUrl} />
+        <Avatar initial={view.initial} color={view.color} size={76} uri={view.photoUrl} />
         <Text style={styles.name}>{pet.name}</Text>
-        <Text style={styles.meta}>{pet.species} · {pet.breed} · {pet.age} · {pet.weightKg} kg</Text>
+        <Text style={styles.meta}>
+          {pet.species} · {pet.breed ?? '—'} · {pet.age ?? '—'} · {pet.weight_kg ?? '—'} kg
+        </Text>
       </View>
 
       <Text style={styles.sectionTitle}>Owner</Text>
@@ -40,26 +95,25 @@ export default function DoctorPatientDetailScreen({ route, navigation }: Props) 
           <Ionicons name="person-outline" size={18} color={colors.textMuted} />
           <Text style={styles.ownerText}>{owner.name}</Text>
         </View>
-        <View style={styles.ownerRow}>
-          <Ionicons name="call-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.ownerText}>{owner.phone}</Text>
-        </View>
+        {owner.phone && (
+          <View style={styles.ownerRow}>
+            <Ionicons name="call-outline" size={18} color={colors.textMuted} />
+            <Text style={styles.ownerText}>{owner.phone}</Text>
+          </View>
+        )}
         <View style={styles.ownerRow}>
           <Ionicons name="mail-outline" size={18} color={colors.textMuted} />
           <Text style={styles.ownerText}>{owner.email}</Text>
         </View>
       </View>
 
-      {thread && (
-        <Button
-          label="Message Owner"
-          variant="outline"
-          onPress={() =>
-            navigation.getParent()?.navigate('Messages', { screen: 'Chat', params: { threadId: thread.id } } as never)
-          }
-          style={styles.messageButton}
-        />
-      )}
+      <Button
+        label="Message Owner"
+        variant="outline"
+        onPress={handleMessageOwner}
+        loading={messaging}
+        style={styles.messageButton}
+      />
 
       <Text style={styles.sectionTitle}>Visit history</Text>
       {visits.length === 0 ? (
@@ -71,7 +125,9 @@ export default function DoctorPatientDetailScreen({ route, navigation }: Props) 
               <Text style={styles.visitReason}>{visit.reason}</Text>
               <Badge label={visit.status} tone={statusTone[visit.status]} />
             </View>
-            <Text style={styles.visitDate}>{visit.date} · {visit.time}</Text>
+            <Text style={styles.visitDate}>
+              {formatDateLabel(visit.slot_at)} · {formatTimeLabel(visit.slot_at)}
+            </Text>
           </View>
         ))
       )}

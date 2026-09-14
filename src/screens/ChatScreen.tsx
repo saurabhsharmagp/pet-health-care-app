@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,66 +13,90 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChatMessage, chatThreads, vets } from '../data/mockData';
+import { getThread, listMessages, sendMessage, subscribeToMessages } from '../api/chat';
+import { getVet, VetDirectoryEntry } from '../api/professionals';
+import { useAuth } from '../lib/AuthContext';
+import { ChatMessageRow, ChatThread } from '../lib/database.types';
+import { formatTimeLabel } from '../lib/format';
 import { ConsultStackParamList } from '../navigation/types';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<ConsultStackParamList, 'Chat'>;
 
-const AUTO_REPLIES = [
-  "Thanks for sharing that. Let's keep an eye on it for the next day.",
-  'Got it. Can you send a photo if the symptoms are visible?',
-  "That's good to hear. Continue with the current routine.",
-  'I recommend booking an in-clinic visit if it does not improve by tomorrow.',
-];
-
 export default function ChatScreen({ route, navigation }: Props) {
-  const vet = vets.find((v) => v.id === route.params.vetId)!;
-  const [messages, setMessages] = useState<ChatMessage[]>(chatThreads[vet.id] ?? []);
+  const { profile } = useAuth();
+  const [thread, setThread] = useState<ChatThread | null>(null);
+  const [vet, setVet] = useState<VetDirectoryEntry | null>(null);
+  const [messages, setMessages] = useState<ChatMessageRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<ScrollView>(null);
 
+  useEffect(() => {
+    (async () => {
+      const t = await getThread(route.params.threadId);
+      if (!t) {
+        setLoading(false);
+        return;
+      }
+      const [v, msgs] = await Promise.all([getVet(t.professional_id), listMessages(t.id)]);
+      setThread(t);
+      setVet(v);
+      setMessages(msgs);
+      setLoading(false);
+    })();
+  }, [route.params.threadId]);
+
+  useEffect(() => {
+    if (!thread) return;
+    const unsubscribe = subscribeToMessages(thread.id, (message) => {
+      setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    return unsubscribe;
+  }, [thread]);
+
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: vet.name,
-      headerRight: vet.supportsVideo
-        ? () => (
-            <TouchableOpacity
-              style={styles.headerVideoButton}
-              onPress={() => navigation.navigate('Payment', { vetId: vet.id, mode: 'video', amount: vet.priceValue })}
-            >
-              <Ionicons name="videocam" size={22} color={colors.primary} />
-            </TouchableOpacity>
-          )
-        : undefined,
+      title: vet?.name ?? 'Chat',
+      headerRight:
+        vet?.supports_video
+          ? () => (
+              <TouchableOpacity
+                style={styles.headerVideoButton}
+                onPress={() => navigation.navigate('VideoCall', { vetId: vet.id })}
+              >
+                <Ionicons name="videocam" size={22} color={colors.primary} />
+              </TouchableOpacity>
+            )
+          : undefined,
     });
   }, [navigation, vet]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = draft.trim();
-    if (!text) return;
-    const userMessage: ChatMessage = {
-      id: `u-${Date.now()}`,
-      sender: 'user',
-      text,
-      time: 'Now',
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    if (!text || !thread || !profile) return;
     setDraft('');
-
-    setTimeout(() => {
-      const reply: ChatMessage = {
-        id: `v-${Date.now()}`,
-        sender: 'vet',
-        text: AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)],
-        time: 'Now',
-      };
-      setMessages((prev) => [...prev, reply]);
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }, 900);
-
+    const message = await sendMessage(thread.id, profile.id, text);
+    setMessages((prev) => [...prev, message]);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!thread || !vet || !profile) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
+        <Text style={styles.emptyText}>Conversation not found.</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
@@ -89,22 +114,17 @@ export default function ChatScreen({ route, navigation }: Props) {
           {messages.length === 0 && (
             <Text style={styles.emptyText}>Say hello to {vet.name} to start the conversation.</Text>
           )}
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.bubble,
-                message.sender === 'user' ? styles.bubbleUser : styles.bubbleVet,
-              ]}
-            >
-              <Text style={[styles.bubbleText, message.sender === 'user' && styles.bubbleTextUser]}>
-                {message.text}
-              </Text>
-              <Text style={[styles.bubbleTime, message.sender === 'user' && styles.bubbleTimeUser]}>
-                {message.time}
-              </Text>
-            </View>
-          ))}
+          {messages.map((message) => {
+            const isUser = message.sender_id === profile.id;
+            return (
+              <View key={message.id} style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleVet]}>
+                <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>{message.text}</Text>
+                <Text style={[styles.bubbleTime, isUser && styles.bubbleTimeUser]}>
+                  {formatTimeLabel(message.created_at)}
+                </Text>
+              </View>
+            );
+          })}
         </ScrollView>
 
         <View style={styles.inputRow}>
