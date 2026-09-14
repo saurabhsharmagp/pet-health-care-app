@@ -1,37 +1,969 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>Kennelo</title>
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
-    <style id="expo-reset">
-      /* These styles make the body full-height */
-      html,
-      body {
-        height: 100%;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
-        overflow: hidden;
-      }
-      /* These styles make the root element full-height */
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
-    </style>
-  <link rel="icon" href="/pet-health-care-app/favicon.ico"/></head>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Kennelo — book vet visits, video consults, dog walking, and home lab tests in one app." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>🐾</text></svg>" />
+<title>Kennelo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap');
 
-  <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <!-- The root element for your Expo app. -->
-    <div id="root"></div>
-  <script src="/pet-health-care-app/_expo/static/js/web/index-cb73a1c3562bdcc1bd79be55be52a200.js" defer></script>
+  :root {
+    --bg: #FBF8F2;
+    --surface: #FFFFFF;
+    --surface-tint: #E3F5F2;
+    --surface-tint-strong: #CDEEE8;
+    --ink: #1F2937;
+    --ink-muted: #6B7280;
+    --ink-soft: #8B95A1;
+    --teal: #0F9D8B;
+    --teal-dark: #0B7A6C;
+    --teal-deep: #0B3B35;
+    --coral: #FF8C42;
+    --coral-deep: #C65E1C;
+    --border: #E7E2D6;
+    --border-strong: #D8D0BD;
+    --shadow: 220 30% 20%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1F1B;
+      --surface: #15302A;
+      --surface-tint: #1B3E36;
+      --surface-tint-strong: #204A40;
+      --ink: #F1F4F2;
+      --ink-muted: #A9BDB6;
+      --ink-soft: #7F9891;
+      --teal: #3FC7AF;
+      --teal-dark: #2FA890;
+      --teal-deep: #DCF7F1;
+      --coral: #FFA666;
+      --coral-deep: #FFC594;
+      --border: #26453C;
+      --border-strong: #2F5348;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0E1F1B;
+    --surface: #15302A;
+    --surface-tint: #1B3E36;
+    --surface-tint-strong: #204A40;
+    --ink: #F1F4F2;
+    --ink-muted: #A9BDB6;
+    --ink-soft: #7F9891;
+    --teal: #3FC7AF;
+    --teal-dark: #2FA890;
+    --teal-deep: #DCF7F1;
+    --coral: #FFA666;
+    --coral-deep: #FFC594;
+    --border: #26453C;
+    --border-strong: #2F5348;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  img { max-width: 100%; }
+
+  h1, h2, h3 {
+    font-family: "Baloo 2", "Work Sans", sans-serif;
+    font-weight: 700;
+    line-height: 1.12;
+    text-wrap: balance;
+    margin: 0;
+    color: var(--ink);
+  }
+
+  a { color: inherit; }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  .eyebrow {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--teal-dark);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .eyebrow { color: var(--teal); }
+  }
+  :root[data-theme="dark"] .eyebrow { color: var(--teal); }
+
+  p.lede {
+    font-size: 1.08rem;
+    color: var(--ink-muted);
+    max-width: 60ch;
+  }
+
+  /* ---------- header ---------- */
+
+  header.site {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    max-width: 1120px;
+    margin: 0 auto;
+    gap: 20px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Baloo 2", sans-serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    text-decoration: none;
+    color: var(--ink);
+  }
+
+  .brand .mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    background: var(--teal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .brand .mark svg { width: 19px; height: 19px; }
+
+  nav.primary {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  nav.primary a {
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--ink-muted);
+    transition: color 0.15s ease;
+  }
+  nav.primary a:hover, nav.primary a:focus-visible { color: var(--teal-dark); }
+  :root[data-theme="dark"] nav.primary a:hover,
+  :root[data-theme="dark"] nav.primary a:focus-visible { color: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) nav.primary a:hover,
+    :root:not([data-theme="light"]) nav.primary a:focus-visible { color: var(--teal); }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: "Work Sans", sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 12px 24px;
+    border-radius: 999px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+
+  .btn-primary {
+    background: var(--teal);
+    color: #fff;
+    box-shadow: 0 10px 22px -10px hsl(var(--shadow) / 0.45);
+  }
+  .btn-primary:hover { background: var(--teal-dark); transform: translateY(-1px); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1.5px solid var(--border-strong);
+  }
+  .btn-ghost:hover { border-color: var(--teal); color: var(--teal-dark); }
+  :root[data-theme="dark"] .btn-ghost:hover { color: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .btn-ghost:hover { color: var(--teal); }
+  }
+
+  .header-cta { display: flex; align-items: center; gap: 14px; }
+  .nav-toggle { display: none; }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    padding: 68px 0 40px;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.35rem, 3.6vw + 1rem, 3.6rem);
+    margin-top: 14px;
+  }
+  .hero h1 .hl { color: var(--teal-dark); }
+  :root[data-theme="dark"] .hero h1 .hl { color: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .hero h1 .hl { color: var(--teal); }
+  }
+
+  .hero p.lede { margin: 20px 0 30px; font-size: 1.12rem; }
+
+  .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
+
+  .hero-note {
+    margin-top: 18px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hero-note .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--coral);
+    flex-shrink: 0;
+  }
+
+  /* phone mockup */
+  .phone-stage {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+
+  .phone-stage::before {
+    content: "";
+    position: absolute;
+    width: 340px;
+    height: 340px;
+    background: radial-gradient(circle, var(--surface-tint) 0%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+  }
+
+  .phone {
+    position: relative;
+    z-index: 1;
+    width: 272px;
+    height: 560px;
+    border-radius: 40px;
+    background: var(--teal-deep);
+    padding: 12px;
+    box-shadow: 0 40px 70px -30px hsl(var(--shadow) / 0.55);
+    animation: float-phone 6s ease-in-out infinite;
+  }
+  :root[data-theme="dark"] .phone { background: #051512; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .phone { background: #051512; }
+  }
+
+  @keyframes float-phone {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .phone { animation: none; }
+  }
+
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    border-radius: 30px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-family: "Work Sans", sans-serif;
+  }
+
+  .phone-hero {
+    background: linear-gradient(160deg, var(--teal) 0%, var(--teal-dark) 100%);
+    padding: 20px 16px 22px;
+    color: #fff;
+  }
+  .phone-hero .greet { font-family: "Baloo 2", sans-serif; font-size: 1.05rem; font-weight: 700; }
+  .phone-hero .sub { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+
+  .phone-pets { display: flex; gap: 8px; padding: 14px 16px 4px; }
+  .phone-pet-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px 10px;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .phone-pet-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .phone-pet-info { min-width: 0; flex: 1; }
+  .phone-pet-card .name,
+  .phone-pet-card .meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .phone-pet-card .name { font-size: 0.72rem; font-weight: 700; color: var(--ink); }
+  .phone-pet-card .meta { font-size: 0.6rem; color: var(--ink-muted); }
+
+  .phone-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  .phone-action {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .phone-action-icon {
+    width: 26px; height: 26px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .phone-action-icon svg { width: 14px; height: 14px; }
+  .phone-action .label { font-size: 0.68rem; font-weight: 700; color: var(--ink); }
+
+  .phone-appt {
+    margin: 4px 16px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phone-appt-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--coral);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+  }
+  .phone-appt-info { min-width: 0; flex: 1; overflow: hidden; }
+  .phone-appt .name,
+  .phone-appt .when {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .phone-appt .name { font-size: 0.7rem; font-weight: 700; color: var(--ink); }
+  .phone-appt .when { font-size: 0.6rem; color: var(--ink-muted); }
+  .phone-appt .pill {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 0.55rem;
+    font-weight: 700;
+    background: var(--surface-tint);
+    color: var(--teal-dark);
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .phone-notch {
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 84px; height: 18px;
+    background: var(--teal-deep);
+    border-radius: 0 0 14px 14px;
+    z-index: 2;
+  }
+  :root[data-theme="dark"] .phone-notch { background: #051512; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .phone-notch { background: #051512; }
+  }
+
+  .float-chip {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: 0 16px 30px -14px hsl(var(--shadow) / 0.4);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    z-index: 2;
+  }
+  .float-chip.a { top: 14%; left: -6%; }
+  .float-chip.b { bottom: 12%; right: -8%; }
+  .float-chip svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  @media (max-width: 900px) {
+    .float-chip { display: none; }
+  }
+
+  /* ---------- section shell ---------- */
+
+  section { padding: 76px 0; }
+  section.tight { padding: 56px 0; }
+
+  .section-head {
+    max-width: 620px;
+    margin-bottom: 44px;
+  }
+  .section-head h2 { font-size: clamp(1.7rem, 2.2vw + 1rem, 2.35rem); margin-top: 10px; }
+  .section-head p { margin-top: 14px; }
+  .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+
+  /* ---------- how it works ---------- */
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    counter-reset: step;
+  }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 28px 26px;
+    position: relative;
+  }
+  .step .num {
+    font-family: "Baloo 2", sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--teal);
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background: var(--surface-tint);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+  .step h3 { font-size: 1.12rem; margin-bottom: 8px; }
+  .step p { color: var(--ink-muted); font-size: 0.94rem; margin: 0; }
+
+  /* ---------- services ---------- */
+
+  .services-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+
+  .service-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 26px 22px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .service-tile:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 40px -24px hsl(var(--shadow) / 0.4);
+    border-color: var(--border-strong);
+  }
+
+  .service-icon {
+    width: 52px; height: 52px;
+    border-radius: 16px;
+    background: var(--surface-tint);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 18px;
+  }
+  .service-icon svg { width: 26px; height: 26px; stroke: var(--teal-dark); }
+  :root[data-theme="dark"] .service-icon svg { stroke: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .service-icon svg { stroke: var(--teal); }
+  }
+
+  .service-tile h3 { font-size: 1.08rem; margin-bottom: 8px; }
+  .service-tile p { color: var(--ink-muted); font-size: 0.9rem; margin: 0; }
+
+  /* ---------- trust ---------- */
+
+  .trust {
+    background: var(--teal-deep);
+    border-radius: 32px;
+    padding: 56px;
+    color: #F4FBF9;
+  }
+  :root[data-theme="dark"] .trust { background: var(--surface); border: 1px solid var(--border); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust { background: var(--surface); border: 1px solid var(--border); }
+  }
+
+  .trust .section-head { color: inherit; }
+  .trust .section-head h2 { color: #fff; }
+  :root[data-theme="dark"] .trust .section-head h2 { color: var(--ink); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust .section-head h2 { color: var(--ink); }
+  }
+  .trust .section-head p { color: #CFE9E3; }
+  :root[data-theme="dark"] .trust .section-head p { color: var(--ink-muted); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust .section-head p { color: var(--ink-muted); }
+  }
+  .trust .eyebrow { color: #8FE0CF; }
+  :root[data-theme="dark"] .trust .eyebrow { color: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust .eyebrow { color: var(--teal); }
+  }
+
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .trust-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.06);
+  }
+  :root[data-theme="dark"] .trust-item { background: var(--surface-tint); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust-item { background: var(--surface-tint); }
+  }
+  .trust-item .ico {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  :root[data-theme="dark"] .trust-item .ico { background: var(--surface); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust-item .ico { background: var(--surface); }
+  }
+  .trust-item .ico svg { width: 19px; height: 19px; stroke: #fff; }
+  :root[data-theme="dark"] .trust-item .ico svg { stroke: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust-item .ico svg { stroke: var(--teal); }
+  }
+  .trust-item h4 { font-family: "Work Sans", sans-serif; font-weight: 700; font-size: 0.98rem; margin: 0 0 4px; color: #fff; }
+  :root[data-theme="dark"] .trust-item h4 { color: var(--ink); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust-item h4 { color: var(--ink); }
+  }
+  .trust-item p { margin: 0; font-size: 0.86rem; color: #CFE9E3; }
+  :root[data-theme="dark"] .trust-item p { color: var(--ink-muted); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .trust-item p { color: var(--ink-muted); }
+  }
+
+  /* ---------- cta band ---------- */
+
+  .cta-band {
+    background: var(--surface-tint);
+    border-radius: 32px;
+    padding: 54px;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 32px;
+    align-items: center;
+  }
+  .cta-band h2 { font-size: clamp(1.6rem, 2vw + 1rem, 2.1rem); }
+  .cta-band p.lede { margin-top: 12px; }
+
+  .store-badges {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .store-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    background: var(--surface);
+    border: 1px dashed var(--border-strong);
+    padding: 9px 14px;
+    border-radius: 12px;
+  }
+  .store-badge svg { width: 16px; height: 16px; }
+
+  .cta-panel {
+    background: var(--surface);
+    border-radius: 22px;
+    padding: 28px;
+    text-align: center;
+  }
+  .cta-panel .btn-primary { width: 100%; margin-bottom: 12px; }
+  .cta-panel .btn-ghost { width: 100%; }
+  .cta-panel .fine { font-size: 0.78rem; color: var(--ink-soft); margin-top: 14px; }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 0 32px;
+  }
+  .footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
+  .footer-links a {
+    font-size: 0.86rem;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .footer-links a:hover { color: var(--teal-dark); }
+  :root[data-theme="dark"] .footer-links a:hover { color: var(--teal); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .footer-links a:hover { color: var(--teal); }
+  }
+  .footer-copy { font-size: 0.82rem; color: var(--ink-soft); }
+
+  /* ---------- reveal-on-load ---------- */
+
+  .reveal {
+    animation: rise 0.7s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .reveal.d1 { animation-delay: 0.08s; }
+  .reveal.d2 { animation-delay: 0.16s; }
+  .reveal.d3 { animation-delay: 0.24s; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { animation: none; }
+  }
+
+  /* ---------- responsive ---------- */
+
+  @media (max-width: 900px) {
+    nav.primary { display: none; }
+    .hero-grid { grid-template-columns: 1fr; }
+    .phone-stage { order: -1; margin-bottom: 8px; }
+    .phone { width: 230px; height: 474px; }
+    .steps { grid-template-columns: 1fr; }
+    .services-grid { grid-template-columns: repeat(2, 1fr); }
+    .trust { padding: 32px 22px; }
+    .trust-grid { grid-template-columns: 1fr; }
+    .cta-band { grid-template-columns: 1fr; padding: 32px 22px; }
+  }
+
+  @media (max-width: 560px) {
+    .services-grid { grid-template-columns: 1fr; }
+    .header-row { padding: 14px 20px; }
+    .header-cta .btn-ghost { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="header-row">
+    <a class="brand" href="#top">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14c-3.5 0-6.5 2.2-6.5 5 0 1.2 1 2 2.3 2 1.4 0 2-.7 4.2-.7s2.8.7 4.2.7c1.3 0 2.3-.8 2.3-2 0-2.8-3-5-6.5-5Z"/><ellipse cx="5.5" cy="9" rx="1.8" ry="2.3"/><ellipse cx="18.5" cy="9" rx="1.8" ry="2.3"/><ellipse cx="9" cy="5.5" rx="1.7" ry="2.2"/><ellipse cx="15" cy="5.5" rx="1.7" ry="2.2"/></svg>
+      </span>
+      Kennelo
+    </a>
+    <nav class="primary">
+      <a href="#services">Services</a>
+      <a href="#how">How it works</a>
+      <a href="#trust">Why Kennelo</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="header-cta">
+      <a class="btn btn-ghost" href="https://saurabhsharmagp.github.io/pet-health-care-app/app/" target="_blank" rel="noopener">Log in</a>
+      <a class="btn btn-primary" href="https://saurabhsharmagp.github.io/pet-health-care-app/app/" target="_blank" rel="noopener">Try it now</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow reveal">Pet healthcare, one calm app</p>
+        <h1 class="reveal d1">Book the vet, the<br><span class="hl">walker</span>, and the lab —<br>without ten phone calls.</h1>
+        <p class="lede reveal d2">Kennelo puts vet visits, video consults, dog walking, and home lab tests in a single booking flow. Pick a real open slot, confirm in a tap, and message your vet directly — no waiting on hold, no payment friction while we finish onboarding professionals.</p>
+        <div class="hero-ctas reveal d3">
+          <a class="btn btn-primary" href="https://saurabhsharmagp.github.io/pet-health-care-app/app/" target="_blank" rel="noopener">Try the live demo →</a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <p class="hero-note reveal d3"><span class="dot"></span> In testing now — iOS &amp; Android apps coming soon</p>
+      </div>
+
+      <div class="phone-stage reveal d2">
+        <div class="float-chip a">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0F9D8B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Booked in 4 taps
+        </div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="phone-hero">
+              <div class="greet">Hello, Priya 👋</div>
+              <div class="sub">Let's take care of Bruno today</div>
+            </div>
+            <div class="phone-pets">
+              <div class="phone-pet-card">
+                <div class="phone-pet-avatar" style="background:#FF8C42">B</div>
+                <div class="phone-pet-info"><div class="name">Bruno</div><div class="meta">Retriever · 3y</div></div>
+              </div>
+              <div class="phone-pet-card">
+                <div class="phone-pet-avatar" style="background:#0F9D8B">W</div>
+                <div class="phone-pet-info"><div class="name">Whiskers</div><div class="meta">Persian</div></div>
+              </div>
+            </div>
+            <div class="phone-actions">
+              <div class="phone-action">
+                <div class="phone-action-icon" style="background:var(--surface-tint)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#0F9D8B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                </div>
+                <div class="label">Book Vet Visit</div>
+              </div>
+              <div class="phone-action">
+                <div class="phone-action-icon" style="background:#FFEDDD">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="m22 8-5 4 5 4V8Z"/></svg>
+                </div>
+                <div class="label">Video Consult</div>
+              </div>
+              <div class="phone-action">
+                <div class="phone-action-icon" style="background:var(--surface-tint)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#0F9D8B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6M8.5 15h7"/></svg>
+                </div>
+                <div class="label">Lab Tests</div>
+              </div>
+              <div class="phone-action">
+                <div class="phone-action-icon" style="background:#FFEDDD">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14c-3.5 0-6.5 2.2-6.5 5 0 1.2 1 2 2.3 2 1.4 0 2-.7 4.2-.7s2.8.7 4.2.7c1.3 0 2.3-.8 2.3-2 0-2.8-3-5-6.5-5Z"/><ellipse cx="5.5" cy="9" rx="1.6" ry="2"/><ellipse cx="18.5" cy="9" rx="1.6" ry="2"/></svg>
+                </div>
+                <div class="label">Book a Walk</div>
+              </div>
+            </div>
+            <div class="phone-appt">
+              <div class="phone-appt-avatar">A</div>
+              <div class="phone-appt-info">
+                <div class="name">Dr. Anjali Rao</div>
+                <div class="when">Sun · 9:30 am</div>
+              </div>
+              <div class="pill">upcoming</div>
+            </div>
+          </div>
+        </div>
+        <div class="float-chip b">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat with your vet
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how" class="tight">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Three steps. No phone tag.</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Pick a real open slot</h3>
+          <p>Browse vets, walkers, and lab packages with live availability — the time you tap is the time you get, not a callback promise.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>Confirm — that's it</h3>
+          <p>No card details, no checkout flow while we finish onboarding professionals. Confirm the booking and settle up at the visit.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Manage it from one place</h3>
+          <p>Message your vet or walker, join a video consult, reschedule, or cancel — all from My Visits, no separate app or spreadsheet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section id="services">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">What's inside</p>
+        <h2>Four ways Kennelo looks after your pet</h2>
+        <p class="lede">Built as one connected app, not four separate bookings.</p>
+      </div>
+      <div class="services-grid">
+        <div class="service-tile">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          </div>
+          <h3>Vet Visits</h3>
+          <p>In-clinic appointments with real vets, filtered by specialty and clinic distance, booked against their actual calendar.</p>
+        </div>
+        <div class="service-tile">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="m22 8-5 4 5 4V8Z"/></svg>
+          </div>
+          <h3>Video Consults</h3>
+          <p>Skip the trip for follow-ups and quick questions — face-to-face with your vet from wherever you and your pet are.</p>
+        </div>
+        <div class="service-tile">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"/><path d="M9 2h6M8.5 15h7"/></svg>
+          </div>
+          <h3>Lab Tests</h3>
+          <p>Home sample collection for wellness panels, allergy screens, and senior checkups — results reviewed by a vet.</p>
+        </div>
+        <div class="service-tile">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14c-3.5 0-6.5 2.2-6.5 5 0 1.2 1 2 2.3 2 1.4 0 2-.7 4.2-.7s2.8.7 4.2.7c1.3 0 2.3-.8 2.3-2 0-2.8-3-5-6.5-5Z"/><ellipse cx="5.5" cy="9" rx="1.8" ry="2.3"/><ellipse cx="18.5" cy="9" rx="1.8" ry="2.3"/><ellipse cx="9" cy="5.5" rx="1.7" ry="2.2"/><ellipse cx="15" cy="5.5" rx="1.7" ry="2.2"/></svg>
+          </div>
+          <h3>Dog Walking</h3>
+          <p>Background-checked walkers for 30/60-minute walks, pet sitting, or overnight boarding — book down to the slot.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section id="trust">
+    <div class="wrap">
+      <div class="trust">
+        <div class="section-head">
+          <p class="eyebrow">Why Kennelo</p>
+          <h2>Built so you're never guessing</h2>
+          <p class="lede">No fake urgency, no hidden fees while we're in testing — just a clearer way to book pet care.</p>
+        </div>
+        <div class="trust-grid">
+          <div class="trust-item">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10V5z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <div>
+              <h4>Background-checked walkers</h4>
+              <p>Every walker on Kennelo is vetted before they can take a booking.</p>
+            </div>
+          </div>
+          <div class="trust-item">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+            <div>
+              <h4>Real-time slots, not requests</h4>
+              <p>What you see on the calendar is what's actually free — no "we'll get back to you."</p>
+            </div>
+          </div>
+          <div class="trust-item">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div>
+              <h4>Chat straight to your vet</h4>
+              <p>Follow-up questions go directly to the professional, not a call center queue.</p>
+            </div>
+          </div>
+          <div class="trust-item">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l6-6M4 12l6 6"/></svg></div>
+            <div>
+              <h4>Cancel or reschedule freely</h4>
+              <p>Plans change — move or cancel a booking from the app in a couple of taps.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="contact" class="tight">
+    <div class="wrap">
+      <div class="cta-band">
+        <div>
+          <p class="eyebrow">Get Kennelo</p>
+          <h2>Try it free, right now, in your browser.</h2>
+          <p class="lede">The full app — booking, chat, and all — is live as a web demo while we prepare for the App Store and Google Play.</p>
+          <div class="store-badges">
+            <span class="store-badge">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08zM12.03 7.25c-.15-2.23 1.66-4.09 3.74-4.25.29 2.31-2.08 4.05-3.74 4.25z"/></svg>
+              iOS — coming soon
+            </span>
+            <span class="store-badge">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.6 2.6c-.4.4-.6.9-.6 1.5v15.8c0 .6.2 1.1.6 1.5l.1.1L13 12 3.7 2.5l-.1.1Z"/><path d="m13 12 3.5-3.5-8.9-5-2 2Z"/><path d="m13 12-7.4 8.5 2 2 8.9-5Z"/><path d="M16.5 15.5 20 13.6c.7-.4.7-1.4 0-1.8l-3.5-1.9L13 12Z"/></svg>
+              Android — coming soon
+            </span>
+          </div>
+        </div>
+        <div class="cta-panel">
+          <a class="btn btn-primary" href="https://saurabhsharmagp.github.io/pet-health-care-app/app/" target="_blank" rel="noopener">Open the web demo</a>
+          <a class="btn btn-ghost" href="mailto:support@kennelo.com">Talk to us</a>
+          <p class="fine">Vet or walker? Email <a href="mailto:support@kennelo.com" style="color:var(--teal-dark)">support@kennelo.com</a> to get onboarded.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap footer-row">
+    <a class="brand" href="#top" style="font-size:1.05rem;">
+      <span class="mark" style="width:28px;height:28px;border-radius:9px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 14c-3.5 0-6.5 2.2-6.5 5 0 1.2 1 2 2.3 2 1.4 0 2-.7 4.2-.7s2.8.7 4.2.7c1.3 0 2.3-.8 2.3-2 0-2.8-3-5-6.5-5Z"/><ellipse cx="5.5" cy="9" rx="1.8" ry="2.3"/><ellipse cx="18.5" cy="9" rx="1.8" ry="2.3"/><ellipse cx="9" cy="5.5" rx="1.7" ry="2.2"/><ellipse cx="15" cy="5.5" rx="1.7" ry="2.2"/></svg>
+      </span>
+      Kennelo
+    </a>
+    <div class="footer-links">
+      <a href="https://saurabhsharmagp.github.io/pet-health-care-app/privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>
+      <a href="https://saurabhsharmagp.github.io/pet-health-care-app/support.html" target="_blank" rel="noopener">Support</a>
+      <a href="mailto:support@kennelo.com">support@kennelo.com</a>
+    </div>
+    <div class="footer-copy">© 2026 Kennelo</div>
+  </div>
+</footer>
 </body>
 </html>
